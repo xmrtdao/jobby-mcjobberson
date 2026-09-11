@@ -9,26 +9,27 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          node-version: 20
-          cache: npm
+          python-version: '3.13'
+          cache: pip
 
       - name: Install dependencies
-        run: npm ci || npm install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
 
-      - name: Build
-        run: npm run build --if-present
+      - name: Compile Python
+        run: python -m compileall -q lead_utils.py scraper_ai.py scraper_exa.py scraper_wedding.py tests
 
       - name: Run tests
-        run: npm test --if-present
+        run: python -m unittest discover -s tests -v
 
-      - name: Verify working state
-        run: |
-          git status --porcelain
-          echo "CI run completed for $(git rev-parse --short HEAD)"
+      - name: Check diff cleanliness
+        run: git diff --check
