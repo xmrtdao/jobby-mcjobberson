@@ -9,6 +9,7 @@ import asyncio
 import re
 import json
 from datetime import datetime
+from lead_utils import normalize_lead
 from playwright.async_api import async_playwright
 
 # Supabase config
@@ -64,15 +65,16 @@ Party Favor Photo Partnership Offer:
                                 pass
                         
                         if email or link:
-                            self.leads.append({
+                            lead = {
                                 'source': 'theknot',
                                 'name': name,
-                                'email': email or f"contact{i}@placeholder.com",
+                                'email': email,
                                 'url': f"https://www.theknot.com{link}" if link else "",
                                 'category': 'wedding_planner',
                                 'location': location.replace('-', ' ').title(),
                                 'scraped_at': datetime.now().isoformat()
-                            })
+                            }
+                            self.leads.append(normalize_lead(lead))
                             print(f"   ✅ {name}: {email or 'No email'}")
                     except Exception as e:
                         print(f"   ⚠️  Error: {e}")
