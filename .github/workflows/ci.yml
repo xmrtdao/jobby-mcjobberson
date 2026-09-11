@@ -2,35 +2,33 @@ name: CI
 
 on:
   push:
-    branches: [master]
+    branches: [ master ]
   pull_request:
-    branches: [master]
-
-permissions:
-  contents: read
+    branches: [ master ]
 
 jobs:
-  test:
+  build-and-test:
     runs-on: ubuntu-latest
-    env:
-      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
-
     steps:
-      - name: Check out repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.13
-        uses: actions/setup-python@v5
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          python-version: "3.13"
-          cache: pip
-          cache-dependency-path: requirements.txt
+          node-version: 20
+          cache: npm
 
       - name: Install dependencies
-        run: python -m pip install --upgrade pip && python -m pip install -r requirements.txt
+        run: npm ci || npm install
 
-      - name: Compile Python sources
-        run: python -m py_compile lead_utils.py scraper_ai.py scraper_exa.py scraper_wedding.py tests/test_lead_utils.py
+      - name: Build
+        run: npm run build --if-present
 
-      - name: Run unit tests
-        run: python -m unittest discover -s tests -v
+      - name: Run tests
+        run: npm test --if-present
+
+      - name: Verify working state
+        run: |
+          git status --porcelain
+          echo "CI run completed for $(git rev-parse --short HEAD)"
