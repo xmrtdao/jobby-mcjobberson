@@ -1,2 +1,1 @@
-requests>=2.31,<3
-playwright>=1.40,<2
+# No third-party runtime dependencies for the current recipient pipeline.
