@@ -30,7 +30,8 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: './docs'
+          # Path to the directory containing the static assets
+          path: 'docs'
 
       - name: Deploy to GitHub Pages
         id: deployment
