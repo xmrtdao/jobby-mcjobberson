@@ -72,3 +72,4 @@ py -m unittest discover -s tests -v
 - `tests/` - standard-library unit tests for the recipient pipeline
 - `.github/workflows/ci.yml` - compile, test, and diff-cleanliness gate
 - `requirements.txt` - intentionally empty because the current pipeline uses only the Python standard library
+ 
