@@ -7,7 +7,7 @@ the canonical fleet services: 'campaign-scheduler' and Resend.
 import json
 import logging
 from typing import Any, Dict, List, Optional
-from .profile import load_profile
+from profile import load_profile
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("jobby.delivery")

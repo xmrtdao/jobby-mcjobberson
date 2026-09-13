@@ -5,7 +5,7 @@ which handles the actual browser automation for form filling and resume uploads.
 """
 
 from typing import Any, Dict, List, Optional
-from .profile import load_profile
+from profile import load_profile
 
 def prepare_ats_payload(lead: Dict[str, Any]) -> Dict[str, Any]:
     """
