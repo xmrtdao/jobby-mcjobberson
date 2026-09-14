@@ -460,3 +460,17 @@ nav a:hover { color: var(--primary); }
   
   .site-footer { padding: 4rem 2rem; }
 }
+
+/* --- Resume drag-drop zone (replaces onboarding 4-step card) --- */
+.resume-drop-zone { padding: 1.5rem; }
+.drop-topline { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+.drop-topline span { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
+.drop-topline strong { font-size: 0.9rem; color: var(--text); }
+.drop-area { border: 2px dashed var(--border); border-radius: 12px; padding: 2rem 1rem; text-align: center; cursor: pointer; transition: border-color 0.2s, background 0.2s; }
+.drop-area:hover, .drop-area.drag-over { border-color: var(--primary); background: var(--accent); }
+.drop-icon { font-size: 2rem; margin-bottom: 0.5rem; }
+.drop-label { font-size: 0.9rem; font-weight: 600; }
+.drop-hint { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem; }
+.drop-status { margin-top: 1rem; font-size: 0.75rem; color: var(--text-muted); min-height: 1.25rem; }
+.dashboard-screen { max-width: 1000px; margin: 0 auto; padding-top: 2rem; }
+.dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-top: 1.5rem; }
