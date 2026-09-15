@@ -47,22 +47,31 @@ def prepare_delivery_payload(personalized_msg: Dict[str, str], profile: Dict[str
 
 def dispatch_to_fleet(payloads: List[Dict[str, Any]], dry_run: bool = True) -> List[Dict[str, Any]]:
     """
-    Interface with the fleet's campaign-scheduler.
-    
-    Args:
-        payloads: List of prepared delivery payloads.
-        dry_run: If True, logs the dispatch without calling the remote API.
+    Interface with the fleet's campaign-scheduler via the relay API.
     """
+    import requests
     results = []
     for payload in payloads:
         if dry_run:
             logger.info(f"[DRY RUN] Dispatching to {payload['recipient']} | Subject: {payload['subject']}")
             results.append({"recipient": payload["recipient"], "status": "dry_run_success"})
         else:
-            # This is where the actual HTTP call to the fleet's campaign-scheduler API would go.
-            # Example: requests.post("https://fleet.internal/dispatch", json=payload)
-            logger.info(f"Dispatching to {payload['recipient']}...")
-            results.append({"recipient": payload["recipient"], "status": "dispatched"})
+            try:
+                # Live relay endpoint for campaign dispatch
+                resp = requests.post(
+                    "https://relay.mobilemonero.com/tools/campaign-scheduler", 
+                    json=payload, 
+                    timeout=10
+                )
+                if resp.status_code == 200:
+                    logger.info(f"Dispatching to {payload['recipient']}... Success")
+                    results.append({"recipient": payload["recipient"], "status": "dispatched"})
+                else:
+                    logger.error(f"Dispatch failed for {payload['recipient']}: {resp.status_code} {resp.text}")
+                    results.append({"recipient": payload["recipient"], "status": "failed", "error": resp.text})
+            except Exception as e:
+                logger.error(f"Network error dispatching to {payload['recipient']}: {e}")
+                results.append({"recipient": payload["recipient"], "status": "error", "error": str(e)})
             
     return results
 

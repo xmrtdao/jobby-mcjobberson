@@ -1,103 +1,105 @@
 """Personalization layer for Jobby McJobberson.
 
-This module generates tailored outreach messages by combining routed lead 
-data with canonical templates and client profile information.
+This module replaces static templates with LLM-driven generation to create 
+bespoke outreach messages and tailored resumes based on lead research 
+and client dossiers.
 """
 
-from typing import Any, Dict, Optional
+import logging
+import requests
+from typing import Any, Dict, Optional, List
 from profile import load_profile
 
-# Professional fallbacks for missing data
-FALLBACKS = {
-    "name": "Hiring Manager",
-    "company": "your company",
-}
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("jobby.personalizer")
 
-# Template Registry (Structure only - actual bodies reside in shared context/profile)
-# In a real production environment, these would be loaded from a secure vault or DB.
-TEMPLATES = {
-    "track1": {
-        "subject": "Consultancy Inquiry: {role} - {client_name}",
-        "greeting": "Hi {recipient_name},",
-        "pitch": "I've been following {company}'s work in the sector and believe my expertise in {target_roles} could provide immediate value to your current initiatives.",
-    },
-    "track2": {
-        "subject": "Contract Opportunity: {role} - {client_name}",
-        "greeting": "Hello {recipient_name},",
-        "pitch": "I am reaching out regarding contract opportunities at {company}. My background in {target_roles} aligns well with the requirements for temporary high-impact roles.",
-    },
-    "track3": {
-        "subject": "Application for {role} - {client_name}",
-        "greeting": "Dear {recipient_name},",
-        "pitch": "I am writing to express my strong interest in the {role} position at {company}. With a proven track record in {target_roles}, I am confident I can contribute to your team's success.",
-    },
-}
+# Configuration for the LLM Brain
+DEFAULT_MODEL = "gemma4:31b"
+OLLAMA_API_URL = "https://relay.mobilemonero.com/tools/llm-generate"
 
-def get_template(track: str) -> Dict[str, str]:
-    """Retrieve the template for the given track, defaulting to track3."""
-    return TEMPLATES.get(track, TEMPLATES["track3"])
+def generate_ai_content(prompt: str, model: str = DEFAULT_MODEL) -> str:
+    """
+    Calls the LLM to generate high-conversion professional content.
+    """
+    try:
+        payload = {
+            "model": model,
+            "prompt": prompt,
+            "stream": False,
+            "options": {
+                "temperature": 0.7,
+                "top_p": 0.9
+            }
+        }
+        
+        resp = requests.post(OLLAMA_API_URL, json=payload, timeout=30)
+        if resp.status_code == 200:
+            return resp.json().get("response", "").strip()
+        else:
+            logger.error(f"LLM Generation failed: {resp.status_code} {resp.text}")
+            return " [ERROR: AI generation failed] "
+    except Exception as e:
+        logger.error(f"Network error during AI generation: {e}")
+        return " [ERROR: AI connection failed] "
 
 def personalize_message(lead: Dict[str, Any], profile: Optional[Dict[str, Any]] = None) -> Dict[str, str]:
     """
-    Generate a personalized outreach message for a routed lead.
-    
-    Args:
-        lead: The routed lead containing 'track', 'name', 'company', etc.
-        profile: Optional client profile. If None, loads from disk.
+    Generate a personalized outreach message using the LLM.
     """
     if profile is None:
         profile = load_profile()
     
-    track = lead.get("track", "track3")
-    template = get_template(track)
+    research = lead.get("research", {})
+    dossier = lead.get("dossier", [])
     
-    # Resolve recipient details with fallbacks
-    recipient_name = lead.get("name") or FALLBACKS["name"]
-    company_name = lead.get("company") or FALLBACKS["company"]
-    
-    # Resolve client details
-    client_name = profile.get("full_name", "Joseph Lee")
-    target_roles = ", ".join(profile.get("target_roles", ["my field"]))
-    
-    # Use the lead's name as the 'role' if it's a job-title lead, 
-    # otherwise use the first target role from the profile.
-    role_context = lead.get("name") if "Engineer" in str(lead.get("name", "")) else \
-                   (profile.get("target_roles", ["Professional"])[0] if profile.get("target_roles") else "Professional")
+    # Use a raw string for the prompt to avoid escape issues
+    prompt = f"""
+You are a world-class talent agent (think Hollywood or Pro Sports). 
+Your goal is to represent your client, {profile.get('full_name')}, in the best possible light.
 
-    # Build Subject
-    subject = template["subject"].format(
-        role=role_context,
-        client_name=client_name
-    )
-    
-    # Build Body
-    # Order: Greeting -> Pitch -> Resume/Contact (to be appended by the sender)
-    greeting = template["greeting"].format(recipient_name=recipient_name)
-    
-    # Pitch formatting: The templates currently don't use {role} in the pitch,
-    # but they do use {company}, {target_roles}, and {recipient_name}.
-    pitch = template["pitch"].format(
-        company=company_name,
-        target_roles=target_roles,
-        recipient_name=recipient_name,
-        role=role_context
-    )
-    
-    # The "canonical" block mentioned in the README:
-    # "a short positioning pitch, the canonical chronological resume, then Joseph's LinkedIn and phone contact block."
+CLIENT PROFILE:
+- Target Roles: {', '.join(profile.get('target_roles', []))}
+- Core Expertise: {profile.get('specialization', 'AI Systems and Blockchain')}
+- Key Businesses/Projects: {profile.get('businesses', [])}
 
-    # We prepare the body as a structured object so the sender can inject the actual resume file/text.
+LEAD DATA:
+- Company: {lead.get('company')}
+- Contact: {lead.get('name')}
+- Role/Opportunity: {lead.get('name')}
+- Research Hooks: {research}
+- Dossier Evidence: {dossier}
+
+TASK:
+Write a high-conversion, professional, yet bold outreach email. 
+1. Use a 'hook' from the research to show we've done our homework.
+2. Position the client as a high-value asset who solves specific problems for {lead.get('company')}.
+3. Avoid generic 'AI-isms'. Sound human, confident, and strategic.
+4. Keep it concise.
+
+OUTPUT FORMAT:
+Subject: [Compelling Subject Line]
+Body: [The email body]
+"""
+
+    ai_output = generate_ai_content(prompt)
     
-    body = f"{greeting}\n\n{pitch}\n\n[CANONICAL_RESUME_BLOCK]\n\n[CONTACT_BLOCK]"
+    subject = "Professional Inquiry"
+    body = ai_output
     
+    if "Subject:" in ai_output:
+        parts = ai_output.split("Body:", 1)
+        subject_part = parts[0].replace("Subject:", "").strip()
+        body = parts[1].strip() if len(parts) > 1 else ai_output
+        subject = subject_part
+
     return {
         "subject": subject,
-        "body": body,
+        "body": f"{body}\n\n[CANONICAL_RESUME_BLOCK]\n\n[CONTACT_BLOCK]",
         "recipient_email": lead.get("email"),
-        "track": track
+        "track": lead.get("track", "track3")
     }
 
-def prepare_outreach_batch(leads: list[Dict[str, Any]]) -> list[Dict[str, Any]]:
+def prepare_outreach_batch(leads: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Personalize messages for a batch of routed leads."""
     profile = load_profile()
     return [personalize_message(lead, profile) for lead in leads]

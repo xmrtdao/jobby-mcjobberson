@@ -13,6 +13,7 @@ import personalizer
 import delivery_adapter
 import ats_adapter
 import state_manager
+from researcher import JobbyResearcher
 
 logging.basicConfig(
     level=logging.INFO,
@@ -25,16 +26,23 @@ class JobbyOrchestrator:
     def __init__(self, dry_run: bool = True):
         self.dry_run = dry_run
         self.profile = load_profile()
+        self.researcher = JobbyResearcher()
 
     def run_pipeline(self, raw_leads: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
         Executes the full Jobby pipeline with durable state:
-        Ingest -> Normalize -> Deduplicate -> Persist/Route -> Personalize -> Dispatch
+        Research -> Ingest -> Normalize -> Deduplicate -> Persist/Route -> Personalize -> Dispatch
         """
         logger.info(f"Starting pipeline for {len(raw_leads)} raw leads...")
 
+        # 0. Deep Research (Build dossiers for leads)
+        enriched_leads = []
+        for lead in raw_leads:
+            research_data = self.researcher.research_lead(lead)
+            enriched_leads.append({**lead, "research": research_data})
+        
         # 1. Clean & Normalize
-        pipeline_result = lead_utils.prepare_recipients(raw_leads)
+        pipeline_result = lead_utils.prepare_recipients(enriched_leads)
         eligible = pipeline_result["eligible"]
         suppressed = pipeline_result["suppressed"]
         discarded = pipeline_result["discarded"]
@@ -53,7 +61,8 @@ class JobbyOrchestrator:
                 "source": lead.get("source"),
                 "source_url": lead.get("url"),
                 "track": routing.determine_track(f"{lead.get('name', '')} {lead.get('company', '')}"),
-                "state": "QUALIFIED"
+                "state": "QUALIFIED",
+                "dossier": lead.get("research", [])
             }
             
             # Persist to local-sb via state_manager
@@ -106,19 +115,14 @@ class JobbyOrchestrator:
         ats_results = []
         if ats_leads:
             logger.info(f"Preparing {len(ats_leads)} ATS application payloads...")
-            ats_payloads = ats_adapter.process_ats_batch(ats_leads)
+            ats_payloads = ats_adapter.process_ats_batch(ats_leads, dry_run=self.dry_run)
             
             for payload in ats_payloads:
                 if "error" not in payload:
                     # Transition state to APPLIED
-                    lead_id = payload["context"].get("lead_id")
+                    lead_id = payload.get("lead_id")
                     if lead_id:
                         state_manager.transition_state(lead_id, "APPLIED")
-                    
-                    if self.dry_run:
-                        logger.info(f"[DRY RUN] ATS Dispatch: {payload.get('target_url')}")
-                    else:
-                        logger.info(f"ATS Dispatch: {payload.get('target_url')}")
                 ats_results.append(payload)
 
         return {

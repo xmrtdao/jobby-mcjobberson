@@ -4,8 +4,12 @@ This module prepares leads for the canonical 'page-agent' service,
 which handles the actual browser automation for form filling and resume uploads.
 """
 
+import logging
 from typing import Any, Dict, List, Optional
 from profile import load_profile
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("jobby.ats")
 
 def prepare_ats_payload(lead: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -43,13 +47,32 @@ def prepare_ats_payload(lead: Dict[str, Any]) -> Dict[str, Any]:
         }
     }
 
-def process_ats_batch(leads: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Prepare a batch of ATS applications."""
+def process_ats_batch(leads: List[Dict[str, Any]], dry_run: bool = True) -> List[Dict[str, Any]]:
+    """Prepare and dispatch a batch of ATS applications."""
+    import requests
     results = []
     for lead in leads:
         try:
-            results.append(prepare_ats_payload(lead))
+            payload = prepare_ats_payload(lead)
+            if dry_run:
+                logger.info(f"[DRY RUN] ATS Dispatch: {payload.get('target_url')}")
+                results.append({"lead_id": lead.get("id"), "status": "dry_run_success"})
+            else:
+                # Live relay endpoint for page-agent automation
+                resp = requests.post(
+                    "https://relay.mobilemonero.com/tools/page-agent-task", 
+                    json=payload, 
+                    timeout=30
+                )
+                if resp.status_code == 200:
+                    logger.info(f"ATS Dispatch Success: {payload.get('target_url')}")
+                    results.append({"lead_id": lead.get("id"), "status": "dispatched"})
+                else:
+                    logger.error(f"ATS Dispatch Failed: {resp.status_code} {resp.text}")
+                    results.append({"lead_id": lead.get("id"), "status": "failed", "error": resp.text})
         except ValueError as e:
-            # Log failure for malformed ATS leads
             results.append({"lead_id": lead.get("id"), "error": str(e)})
+        except Exception as e:
+            logger.error(f"Network error in ATS dispatch for {lead.get('id')}: {e}")
+            results.append({"lead_id": lead.get("id"), "status": "error", "error": str(e)})
     return results
