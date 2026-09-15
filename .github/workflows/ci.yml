@@ -13,6 +13,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -24,10 +26,17 @@ jobs:
         run: python -m pip install -r requirements.txt
 
       - name: Compile Python
-        run: python -m compileall -q lead_utils.py newsletter_ingest.py tests
+        run: python -m compileall -q lead_utils.py newsletter_ingest.py resume_ingest.py resume_server.py tests
 
       - name: Run tests
         run: python -m unittest discover -s tests -v
 
+      - name: Check static portal
+        run: |
+          test -f docs/index.html
+          test -f docs/styles.css
+          test -f docs/app.js
+          node --check docs/app.js
+
       - name: Check diff cleanliness
-        run: git diff --check
+        run: git diff --check HEAD^ HEAD

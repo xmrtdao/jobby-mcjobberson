@@ -1,1 +1,1 @@
-# No third-party runtime dependencies for the current recipient pipeline.
+pypdf==6.18.1

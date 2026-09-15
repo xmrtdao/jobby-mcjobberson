@@ -50,15 +50,27 @@ Outbound hiring-manager messages use this order: a short positioning pitch, the 
 
 ## Development and verification
 
-The project uses Python 3.13 in CI and has no third-party runtime dependency for the current recipient pipeline.
+The project uses Python 3.13 in CI. The resume parser uses the pinned `pypdf` dependency; the recipient pipeline remains standard-library only.
 
 From the repository root:
 
 ```bash
+python -m pip install -r requirements.txt
 python -m unittest discover -s tests -v
-python -m compileall -q lead_utils.py tests
+python -m compileall -q lead_utils.py newsletter_ingest.py resume_ingest.py resume_server.py tests
+node --check docs/app.js
 git diff --check
 ```
+
+The parser endpoint is a local development adapter, not a GitHub Pages runtime. Start it with:
+
+```bash
+python resume_server.py --host 127.0.0.1 --port 8000
+```
+
+Then open `http://127.0.0.1:8000/` and use the hero uploader. The endpoint accepts one PDF, DOCX, or TXT file up to 10 MB and returns only source-derived text, skills, job fields, URLs, and email addresses. This bounded cycle intentionally does not persist uploads or invoke page-agent.
+
+Known limitation: PDF stream decompression does not yet have a hard per-stream decompressed-size ceiling. A malicious PDF could consume excessive memory or CPU, so this local adapter should not be exposed to untrusted high-risk traffic until that hardening is completed in a follow-up sprint.
 
 On the Windows fleet workspace, the equivalent test command is:
 
@@ -69,7 +81,10 @@ py -m unittest discover -s tests -v
 ## Repository layout
 
 - `lead_utils.py` - recipient normalization, identity, deduplication, and suppression helpers
-- `tests/` - standard-library unit tests for the recipient pipeline
-- `.github/workflows/ci.yml` - compile, test, and diff-cleanliness gate
-- `requirements.txt` - intentionally empty because the current pipeline uses only the Python standard library
+- `resume_ingest.py` - source-derived TXT/PDF/DOCX resume parser
+- `resume_server.py` - local same-origin static portal and `/api/resume/parse` adapter
+- `docs/` - public hero, styles, and browser interaction script
+- `tests/` - standard-library unit tests for the recipient and resume pipelines
+- `.github/workflows/ci.yml` - dependency, compile, test, static, and diff-cleanliness gate
+- `requirements.txt` - pinned parser dependency (`pypdf`)
  

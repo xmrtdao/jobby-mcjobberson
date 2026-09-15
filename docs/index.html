@@ -20,7 +20,7 @@
       <a href="#funnel">Funnel</a>
       <a href="#tracks">Tracks</a>
       <a href="#audit">Audit</a>
-      <a class="button button-small" href="javascript:void(0)" onclick="openOnboarding()">Get started</a>
+      <button class="button button-small" type="button" data-open-onboarding>Get started</button>
     </nav>
   </header>
 
@@ -31,22 +31,44 @@
         <h1>Prepare. Personalize. Track. Apply with control.</h1>
         <p class="lede">A sophisticated orchestration layer that transforms resumes, contacts, and opportunities into an auditable, high-conversion job search system.</p>
         <div class="hero-actions">
-          <a class="button" href="javascript:void(0)" onclick="openOnboarding()">Start onboarding</a>
+          <button class="button" type="button" data-open-onboarding>Start onboarding</button>
           <a class="button secondary" href="#tracks">View tracks</a>
         </div>
       </div>
-      <div class="hero-card" aria-label="Onboarding preview">
-        <div class="card-topline">
-          <span>Onboarding status</span>
-          <strong>4 steps</strong>
+      <section class="resume-drop-zone" id="resume-drop-zone" aria-label="Resume ingestion">
+        <div class="drop-topline">
+          <span>Resume parsing</span>
+          <strong>Drop a resume to build a source-derived profile</strong>
         </div>
-        <ol class="step-list">
-          <li><span>01</span><div><strong>Profile</strong><p>Canonical resume, contact block, and target roles.</p></div></li>
-          <li><span>02</span><div><strong>Package</strong><p>Asset verification and ATS-readiness checklist.</p></div></li>
-          <li><span>03</span><div><strong>Opportunities</strong><p>Source integration and recipient preparation.</p></div></li>
-          <li><span>04</span><div><strong>Launch</strong><p>Outreach, applications, and response tracking.</p></div></li>
-        </ol>
-      </div>
+        <div class="drop-area" id="resume-drop-area" role="button" tabindex="0" aria-controls="resume-file">
+          <div class="drop-icon" aria-hidden="true">⇩</div>
+          <p class="drop-label"><strong>Drop your resume here</strong></p>
+          <p class="drop-hint">PDF, DOCX, or TXT · up to 10 MB</p>
+          <input type="file" id="resume-file" accept=".pdf,.docx,.txt" aria-label="Choose a resume">
+        </div>
+        <p class="drop-status" id="resume-status" role="status" aria-live="polite"></p>
+      </section>
+      <section class="parsed-profile-section" id="parsed-profile" aria-label="Parsed resume profile" hidden>
+        <div class="section-heading">
+          <p class="eyebrow">Source-derived profile</p>
+          <h2>Resume signals ready for review</h2>
+          <p>Only content found in the uploaded resume is shown.</p>
+        </div>
+        <div class="parsed-profile-grid">
+          <article class="parsed-card">
+            <h3>Skills</h3>
+            <ul id="parsed-skills"></ul>
+          </article>
+          <article class="parsed-card">
+            <h3>Related job fields</h3>
+            <ul id="parsed-fields"></ul>
+          </article>
+          <article class="parsed-card">
+            <h3>Links</h3>
+            <ul id="parsed-links"></ul>
+          </article>
+        </div>
+      </section>
     </section>
 
     <section class="section" id="funnel">
@@ -134,7 +156,7 @@
         <p class="eyebrow">Client onboarding</p>
         <h2>Ready to turn the search into a system?</h2>
         <p>Experience the orchestration layer. Use this portal to define your professional identity, integrate your opportunities, and launch a controlled, auditable outreach engine.</p>
-        <a class="button" href="javascript:void(0)" onclick="openOnboarding()">Start onboarding</a>
+        <button class="button" type="button" data-open-onboarding>Start onboarding</button>
       </div>
     </section>
   </main>
@@ -160,7 +182,7 @@
         </div>
         <div class="modal-nav">
           <div></div>
-          <button class="button" onclick="nextStep(2)">Continue</button>
+          <button class="button" type="button" data-onboarding-step="2">Continue</button>
         </div>
       </div>
 
@@ -177,8 +199,8 @@
           <input type="url" id="onboard-cover" placeholder="https://...">
         </div>
         <div class="modal-nav">
-          <button class="button secondary" onclick="nextStep(1)">Back</button>
-          <button class="button" onclick="nextStep(3)">Continue</button>
+          <button class="button secondary" type="button" data-onboarding-step="1">Back</button>
+          <button class="button" type="button" data-onboarding-step="3">Continue</button>
         </div>
       </div>
 
@@ -191,8 +213,8 @@
           <textarea id="onboard-sources" rows="3" placeholder="e.g. LinkedIn, Industry Newsletters, Direct Referrals"></textarea>
         </div>
         <div class="modal-nav">
-          <button class="button secondary" onclick="nextStep(2)">Back</button>
-          <button class="button" onclick="nextStep(4)">Continue</button>
+          <button class="button secondary" type="button" data-onboarding-step="2">Back</button>
+          <button class="button" type="button" data-onboarding-step="4">Continue</button>
         </div>
       </div>
 
@@ -200,59 +222,17 @@
         <p class="eyebrow">Step 04</p>
         <h2>Ready for Launch</h2>
         <p>Confirm your details and activate the command center.</p>
-        <div id="summary-box" style="background: var(--bg); padding: 1rem; border-radius: 8px; margin-bottom: 2rem; font-size: 0.875rem;">
+        <div id="summary-box">
           <!-- Summary injected by JS -->
         </div>
         <div class="modal-nav">
-          <button class="button secondary" onclick="nextStep(3)">Back</button>
-          <button class="button" onclick="finishOnboarding()">Finish & Activate</button>
+          <button class="button secondary" type="button" data-onboarding-step="3">Back</button>
+          <button class="button" type="button" data-onboarding-finish>Finish &amp; Activate</button>
         </div>
       </div>
     </div>
   </div>
 
-  <script>
-    function openOnboarding() {
-      document.getElementById('onboarding-overlay').style.display = 'flex';
-    }
-
-    function nextStep(stepNum) {
-      document.querySelectorAll('.onboarding-step').forEach(step => {
-        step.classList.remove('active');
-      });
-      const next = document.querySelector(`.onboarding-step[data-step="${stepNum}"]`);
-      next.classList.add('active');
-
-      if (stepNum === 4) {
-        updateSummary();
-      }
-    }
-
-    function updateSummary() {
-      const name = document.getElementById('onboard-name').value;
-      const roles = document.getElementById('onboard-roles').value;
-      const resume = document.getElementById('onboard-resume').value;
-      const sources = document.getElementById('onboard-sources').value;
-      
-      document.getElementById('summary-box').innerHTML = `
-        <strong>Name:</strong> ${name || 'Not provided'}<br>
-        <strong>Roles:</strong> ${roles || 'Not provided'}<br>
-        <strong>Resume:</strong> ${resume || 'Not provided'}<br>
-        <strong>Sources:</strong> ${sources || 'Not provided'}
-      `;
-    }
-
-    function finishOnboarding() {
-      alert('Onboarding complete. Jobby is now active for ' + document.getElementById('onboard-name').value);
-      document.getElementById('onboarding-overlay').style.display = 'none';
-    }
-
-    window.onclick = function(event) {
-      const overlay = document.getElementById('onboarding-overlay');
-      if (event.target == overlay) {
-        overlay.style.display = 'none';
-      }
-    }
-  </script>
+  <script src="app.js" defer></script>
 </body>
 </html>

@@ -129,14 +129,15 @@ Feature card examples:
 
 ## MVP implementation in this repo
 
-This repo should gain a static portal prototype before any backend/database work.
+This repo's public hero is implemented under `docs/` and includes a source-derived resume parsing control for supported PDF, DOCX, and TXT uploads. For local development, `resume_server.py` serves the same-origin portal and parses uploads through `/api/resume/parse`; it does not send files to external or hardcoded third-party services or fabricate profile data.
 
 Add:
-- `portal/` directory with static HTML/CSS.
-- `portal/index.html` as the branded landing/onboarding funnel.
-- `portal/styles.css` for the Jobby visual system.
-- `portal/README.md` documenting the funnel, copy, and limitations.
+- `docs/` directory with static HTML/CSS/JavaScript for the public hero.
+- `docs/index.html` as the branded landing/onboarding funnel.
+- `docs/styles.css` for the Jobby visual system.
+- `docs/app.js` for the uploader and onboarding interactions.
 
+Do not add a parallel `portal/` implementation; `docs/` is the canonical public portal.
 Do not add:
 - Production auth.
 - Payment collection.
@@ -150,6 +151,8 @@ Do not add:
 Before calling this done:
 
 - Static portal renders in a browser.
+- The hero uploader accepts one PDF, DOCX, or TXT file up to 10 MB.
+- Parsed fields are rendered only from source text and links found in the uploaded resume.
 - Links are internal-only.
 - Copy matches Jobby's actual scope.
 - No fabricated contact data appears.
