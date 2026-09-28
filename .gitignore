@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+*.pyo
+
+*.log
+crash_log.txt
+serve.log
+push.log
+proxy_server.log
+debug_server.log
+vite-dev.log
+resume_server.log
+
+.env
+*.key
+*.pem

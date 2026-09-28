@@ -1,34 +1,13 @@
 {
-  "full_name": "Joseph Andrew Lee",
+  "full_name": "Joseph Lee",
   "target_roles": [
-    "AI Systems Architect",
-    "Blockchain Engineer",
-    "Strategic Consultant",
-    "Business Development Lead"
+    "Senior Engineer",
+    "Systems Architect"
   ],
-  "resume_url": "https://xmrtdao.github.io/jobby-mcjobberson/resume.pdf",
-  "cover_letter_url": "https://xmrtdao.github.io/jobby-mcjobberson/cover_letter.pdf",
+  "resume_url": "https://example.com/resume",
+  "cover_letter_url": "https://example.com/cover",
   "primary_sources": [
-    "LinkedIn",
-    "Indeed",
-    "Twitter/X",
-    "Direct Networking"
+    "LinkedIn"
   ],
-  "preferences": {
-    "phone": "+1-XXX-XXX-XXXX",
-    "timezone": "CST",
-    "priority": "High-Impact/High-Equity"
-  },
-  "businesses": [
-    {
-      "name": "xmrtdao",
-      "url": "https://xmrtdao.org",
-      "role": "Founder/Lead"
-    },
-    {
-      "name": "Party Favor Photo",
-      "url": "https://partyfavorphoto.com",
-      "role": "Owner"
-    }
-  ]
+  "preferences": {}
 }

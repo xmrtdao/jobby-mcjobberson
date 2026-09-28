@@ -10,15 +10,19 @@ from typing import Any
 from xml.etree import ElementTree
 
 from newsletter_ingest import _EMAIL_RE, _URL_RE
-from pypdf import PdfReader, apply_configuration
-from pypdf.errors import LimitReachedError, PyPdfError
-from pypdf.generic import (
-    ArrayObject,
-    DictionaryObject,
-    IndirectObject,
-    NameObject,
-    StreamObject,
-)
+try:
+    from pypdf import PdfReader, apply_configuration
+    from pypdf.errors import LimitReachedError, PyPdfError
+    from pypdf.generic import (
+        ArrayObject,
+        DictionaryObject,
+        IndirectObject,
+        NameObject,
+        StreamObject,
+    )
+    _PDF_SUPPORT = True
+except Exception:
+    _PDF_SUPPORT = False
 
 
 MAX_RESUME_BYTES = 10 * 1024 * 1024
@@ -30,12 +34,130 @@ _SUPPORTED_FORMATS = {"pdf", "docx", "txt"}
 _WORDPROCESSING_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 _URL_CLEANUP = ".,;:!?)]}>'\""
 _EMAIL_CLEANUP = _URL_CLEANUP
+# Matches a skills label on its own, with an optional inline list. The
+# separator is optional but the rest of the line must be empty when it is
+# absent, so prose like "Skilled in Python" is not mistaken for a label.
+#
+# "CORE COMPETENCIES" is included because it is one of the most common resume
+# headings there is and its absence meant a whole section of named skills was
+# silently dropped. That label also uses a "Category: a, b, c" line shape, which
+# _extract_skills handles separately.
 _SKILL_LABEL_RE = re.compile(
-    r"(?:^|\n)\s*(?:technical\s+)?skills?\s*[:\-]\s*(.+)$",
+    r"^[ \t]*(?:technical\s+|core\s+|key\s+|main\s+|primary\s+)?"
+    r"(?:areas?\s+of\s+)?"
+    r"(?:skills?|tools?|technologies|tech\s+stack|expertise|competenc(?:y|ies)|strengths)"
+    r"(?:\s+(?:&|and)\s+[\w\s]+?)?"
+    r"\s*(?:[:\-]\s*(.*))?$",
     re.IGNORECASE,
 )
+# A skills block continues onto following lines. It ends at a blank line or
+# at the next section heading, recognised by being a short all-caps line or a
+# title ending in a colon ("EXPERIENCE", "Certifications:").
+_SECTION_HEADING_RE = re.compile(
+    r"^(?:[A-Z][A-Z0-9 &/'\-\.]{2,}[ \t]*:?|[A-Z][A-Za-z][A-Za-z ]{2,40}:)$"
+)
+_SKILL_DELIMITERS = (",", ";", "|", "\u2022", "\u00b7", "*")
+_MAX_SKILL_CONTINUATION_LINES = 8
+# A years-of-experience figure the document states outright, such as
+# "15+ years of proven leadership" or "10 years in sales". The qualifier words
+# keep a per-role duration ("3 years at Acme") from being read as a lifetime
+# total when a summary is present. Years is a small, bounded claim: capping at
+# 60 keeps a phone number or a ZIP+4 from being read as decades.
+_STATED_YEARS_RE = re.compile(
+    r"(?<![\d.])(\d{1,2})\s*\+?\s*\+?\s*years?\b"
+    r"(?![\d])",
+    re.IGNORECASE,
+)
+_YEARS_QUALIFIER_RE = re.compile(
+    r"(experience|professional|industry|career|leadership|proven|track record"
+    r"|background|working|work)",
+    re.IGNORECASE,
+)
+_MAX_CAREER_YEARS = 60
+
+
+def _extract_stated_experience_years(text: str) -> float | None:
+    """Return a years-of-experience figure the document actually states.
+
+    A qualifier like "of proven leadership" or "of experience" belongs to the
+    number it follows, so each candidate is judged only on the clause between it
+    and the next years-figure. A fixed character window is wrong here: in
+    "12 years total. 15 years of professional leadership" a wide window lets
+    the later qualifier reach back and validate the 12, and the 12 wins.
+
+    Where no figure is qualified, the largest is used. A career total is never
+    shorter than one role inside it, so the maximum cannot understate the way
+    taking the first match would. Returns None when the document states no
+    figure, so the caller records a gap instead of computing one.
+    """
+    fallback: float | None = None
+    for line in text.splitlines():
+        matches = list(_STATED_YEARS_RE.finditer(line))
+        for index, match in enumerate(matches):
+            try:
+                years = float(match.group(1))
+            except ValueError:
+                continue
+            if years <= 0 or years > _MAX_CAREER_YEARS:
+                continue
+            # The clause this number governs: from the end of the previous
+            # figure to the start of the next one.
+            clause_start = matches[index - 1].end() if index else 0
+            clause_end = (
+                matches[index + 1].start() if index + 1 < len(matches) else len(line)
+            )
+            clause = line[clause_start:clause_end]
+            if _YEARS_QUALIFIER_RE.search(clause):
+                return years
+            fallback = years if fallback is None else max(fallback, years)
+    return fallback
+
+
+# A phone number as written on a resume. Requires seven or more digits so that
+# bare years, date ranges and postal codes are not read as numbers to call. The
+# separator run is bounded so a phone cannot swallow a following date or ID.
+_PHONE_RE = re.compile(
+    r"(?<![\w.])\+?\d[\d\s().\u2010-\u2015-]{6,22}\d(?![\w-])"
+)
+_MIN_PHONE_DIGITS = 7
+
+
+def _extract_phones(text: str) -> list[str]:
+    """Return phone-shaped strings the document actually states.
+
+    Formatting is normalised to a readable form but the digits are preserved
+    exactly; nothing is guessed from a name or an email local part.
+    """
+    phones: list[str] = []
+    seen: set[str] = set()
+    for match in _PHONE_RE.finditer(text):
+        raw = match.group(0).strip()
+        digits = re.sub(r"\D", "", raw)
+        if len(digits) < _MIN_PHONE_DIGITS or len(digits) > 15:
+            continue
+        # A match whose every digit group is exactly four digits is a year
+        # range ("2004 - 2014"), not a number to dial. Such a string also
+        # satisfies the 7-to-15 digit length rule, because the dash between
+        # the years is inside the character class. The length rule alone
+        # therefore cannot separate a phone from employment dates.
+        groups = re.findall(r"\d+", raw)
+        if groups and all(len(g) == 4 for g in groups):
+            continue
+        pretty = re.sub(r"[\s().-]+", " ", raw).strip()
+        key = digits
+        if key not in seen:
+            seen.add(key)
+            phones.append(pretty)
+    return phones
+
+
 _JOB_FIELD_RULES = (
-    (re.compile(r"\barchitect\b", re.IGNORECASE), "Architecture"),
+    # "architectural"/"architecture" rather than bare "architect": the bare
+    # form is overwhelmingly a job title ("Systems Architect") or a verb
+    # ("architect of complex projects"), and matching it put a sales and
+    # media professional into the Architecture industry. Someone who
+    # actually works in architecture writes the noun or adjective somewhere.
+    (re.compile(r"\barchitectural\b|\barchitecture\b", re.IGNORECASE), "Architecture"),
     (
         re.compile(r"\b(?:cloud|aws|azure|gcp|kubernetes|terraform|devops|infrastructure)\b", re.IGNORECASE),
         "Cloud Engineering",
@@ -276,29 +398,299 @@ def _unique_matches(pattern: re.Pattern[str], text: str, cleanup: str) -> list[s
     return matches
 
 
+def _iter_skill_blocks(text: str) -> list[str]:
+    """Return the payload text of every skills block in the document.
+
+    Handles both layouts seen in the wild: the list on the same line as the
+    label ("Skills: Python, Go") and the label alone on its own line with the
+    list underneath, which the original single-line pattern silently missed.
+    """
+    lines = text.splitlines()
+    blocks: list[str] = []
+    index = 0
+    while index < len(lines):
+        match = _SKILL_LABEL_RE.match(lines[index])
+        if not match:
+            index += 1
+            continue
+
+        inline = (match.group(1) or "").strip()
+        if inline:
+            blocks.append(inline)
+            index += 1
+            continue
+
+        # Bare label: consume the following lines until the block ends.
+        index += 1
+        taken = 0
+        while index < len(lines) and taken < _MAX_SKILL_CONTINUATION_LINES:
+            candidate = lines[index].strip()
+            if not candidate or _SECTION_HEADING_RE.match(candidate):
+                break
+            # Continue only when the line actually reads as a list, or it is
+            # the first line and the block is followed immediately by the end
+            # of the section. A leading bullet marker counts as a list too.
+            body = candidate.lstrip("-+\u2013\u2014\u2022\u00b7*").strip()
+            looks_like_list = body != candidate or any(
+                d in candidate for d in _SKILL_DELIMITERS
+            )
+            nxt = lines[index + 1].strip() if index + 1 < len(lines) else ""
+            block_ends = not nxt or bool(_SECTION_HEADING_RE.match(nxt))
+            if not looks_like_list and not (taken == 0 and block_ends):
+                break
+            blocks.append(candidate)
+            index += 1
+            taken += 1
+    return blocks
+
+
+def _clean_skill(value: str) -> str:
+    skill = value.strip().strip("-+\u2013\u2014").strip().strip(".\u2022")
+    return re.sub(r"\s+", " ", skill)
+
+
+# A "Category: a, b, c" line inside a skills block. The category is itself a
+# competency worth keeping, and the values after the colon are the individual
+# skills. Capped short and barred from sentence punctuation, so prose such as
+# "Note: unavailable until March, ideally" is not read as a competency.
+_CATEGORY_LINE_RE = re.compile(r"^(?P<label>[^:]{2,60}):\s*(?P<values>.+)$")
+
+
 def _extract_skills(text: str) -> list[str]:
     """Return explicitly listed skills without inventing implied expertise."""
     skills: list[str] = []
     seen: set[str] = set()
-    for line in text.splitlines():
-        match = _SKILL_LABEL_RE.search(line)
-        if not match:
-            continue
-        for raw_skill in re.split(r"[,;|]", match.group(1)):
-            skill = raw_skill.strip().strip("•*+-").strip()
-            key = skill.casefold()
-            if skill and key not in seen:
-                seen.add(key)
-                skills.append(skill)
+
+    def add(value: str) -> None:
+        skill = _clean_skill(value)
+        if not skill or len(skill) > 80:
+            return
+        key = skill.casefold()
+        if key not in seen:
+            seen.add(key)
+            skills.append(skill)
+
+    for block in _iter_skill_blocks(text):
+        # A competencies section groups skills under a heading:
+        #   "Consultative Selling & Closing: value alignment, active listening"
+        # Splitting on commas alone glued the heading onto the first value,
+        # inventing a bogus skill and losing the real one.
+        category = _CATEGORY_LINE_RE.match(block.strip())
+        if category:
+            label = category.group("label")
+            if not re.search(r"[.!?]", label):
+                add(label)
+            block = category.group("values")
+        for raw_skill in re.split(r"[,;|\u2022\u00b7*]", block):
+            add(raw_skill)
     return skills
+
+
+# A job header line, e.g. "Lead Platform Engineer - Acme Systems (March 2021 -
+# present)" or "Platform Engineer, Beta Labs, June 2017 - February 2021".
+# Both forms require a date range, which keeps ordinary bullet lines out.
+_DATE_TOKEN = (
+    r"(?:[A-Za-z]{3,9}\.?\s+\d{4}|\d{1,2}\s*[/-]\s*\d{4}|(?:19|20)\d{2})"
+)
+_END_TOKEN = r"(?:" + _DATE_TOKEN + r"|present|current|now|ongoing|to\s+date)"
+_EMPLOYMENT_HEADER_RES = (
+    # Title - Company (Start - End)
+    re.compile(
+        r"^[ \t]*(?P<title>[^\n()]{2,70}?)[ \t]*(?:[ \t]+at[ \t]+|@|[-–—•])[ \t]*"
+        r"(?P<company>[^\n()]{2,70}?)[ \t]*\([ \t]*"
+        r"(?P<start>" + _DATE_TOKEN + r")[ \t]*(?:-|–|—|to|until|through)[ \t]*"
+        r"(?P<end>" + _END_TOKEN + r")[ \t]*\)[ \t]*$",
+        re.IGNORECASE,
+    ),
+    # Title, Company, Start - End
+    re.compile(
+        r"^[ \t]*(?P<title>[^\n,|]{2,70}?)[ \t]*(?:,| at |@)[ \t]*"
+        r"(?P<company>[^\n,|]{2,70}?)[ \t]*,[ \t]*"
+        r"(?P<start>" + _DATE_TOKEN + r")[ \t]*(?:-|–|—|to|until|through)[ \t]*"
+        r"(?P<end>" + _END_TOKEN + r")[ \t]*$",
+        re.IGNORECASE,
+    ),
+)
+_CURRENT_WORDS = {"present", "current", "now", "ongoing", "to date"}
+
+# A responsibility bullet sitting directly under a job header.
+_BULLET_LINE_RE = re.compile(r"^[\u2022\u00b7\-\*\u2013\u2014+]\s*(?P<body>.+)$")
+_MAX_JOB_HIGHLIGHTS = 10
+
+# A TLD allowlist keeps ordinary prose out: "Node.js", "resume.docx" and "1.2"
+# are not links, but "github.com/user" and "jellis.dev" are.
+_TLD_ALTERNATION = (
+    "com|org|net|edu|gov|io|dev|ai|co|me|app|tech|info|biz|site|online|xyz|us|uk|ca"
+)
+# The lookbehind rejects a domain that is the host part of an email address.
+_BARE_DOMAIN_RE = re.compile(
+    r"(?<![@.\w])"
+    r"(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+(?:" + _TLD_ALTERNATION + r")\b"
+    r"(?:/[^\s<>\"']*)?",
+    re.IGNORECASE,
+)
+
+
+def _url_key(value: str) -> str:
+    """Compare URLs ignoring the scheme, so https://x.com and x.com are one."""
+    return re.sub(r"^https?://", "", value, flags=re.IGNORECASE).casefold().rstrip("/")
+
+
+def _extract_urls(text: str) -> list[str]:
+    """Return full URLs plus bare domains such as "github.com/user".
+
+    Resumes routinely list profiles with no scheme, and the newsletter-grade
+    _URL_RE requires http(s):// — so those links were being dropped entirely.
+    """
+    urls = _unique_matches(_URL_RE, text, _URL_CLEANUP)
+    seen = {_url_key(url) for url in urls}
+
+    email_domains: set[str] = set()
+    for address in _unique_matches(_EMAIL_RE, text, _EMAIL_CLEANUP):
+        _, _, domain = address.partition("@")
+        if domain:
+            email_domains.add(domain.casefold())
+
+    for match in _BARE_DOMAIN_RE.findall(text):
+        candidate = match.strip(_URL_CLEANUP)
+        key = _url_key(candidate)
+        if not key or key in seen:
+            continue
+        host = key.split("/", 1)[0]
+        # A domain belonging to an email address is not a profile link.
+        if host in email_domains or any(
+            host == d or host.endswith("." + d) for d in email_domains
+        ):
+            continue
+        seen.add(key)
+        urls.append(candidate)
+    return urls
+
+
+def _extract_employment_headers(text: str) -> list[dict[str, Any]]:
+    """Pull role/company/date-range headers and their bullets from the document.
+
+    Used to cross-check the AI-extracted timeline. The model was observed
+    transposing month and year (emitting "2017-03" for a job the resume dates
+    "March 2021"), which produced a work history overlapping the previous role.
+    These values are copied verbatim from the text, so they win.
+
+    The bullet lines directly beneath a header are its highlights. Those were
+    also coming back empty from the model on some runs, and they are the most
+    informative part of a resume, so they are read from the source.
+    """
+    headers: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    lines = text.splitlines()
+    index = 0
+    while index < len(lines):
+        stripped = lines[index].strip().strip("*#>-").strip()
+        index += 1
+        if not stripped:
+            continue
+        matched = None
+        for pattern in _EMPLOYMENT_HEADER_RES:
+            match = pattern.match(stripped)
+            if not match:
+                continue
+            title = match.group("title").strip(" ,;|-–—•")
+            company = match.group("company").strip(" ,;|-–—•")
+            start = match.group("start").strip()
+            end = match.group("end").strip()
+            if not title or not company:
+                matched = False
+                break
+            # A reversed range is not a header.
+            if re.fullmatch(r"\d{4}", start) and re.fullmatch(r"\d{4}", end):
+                if int(end) < int(start):
+                    matched = False
+                    break
+            matched = (title, company, start, end)
+            break
+        if matched is None or matched is False:
+            continue
+        title, company, start, end = matched
+        key = (title.casefold(), company.casefold())
+        if key in seen:
+            continue
+        seen.add(key)
+
+        # Bullet lines immediately following the header belong to this job.
+        highlights: list[str] = []
+        while (
+            index < len(lines)
+            and len(highlights) < _MAX_JOB_HIGHLIGHTS
+        ):
+            bullet = _BULLET_LINE_RE.match(lines[index].strip())
+            if not bullet:
+                break
+            text_body = bullet.group(1).strip()
+            if text_body:
+                highlights.append(re.sub(r"\s+", " ", text_body))
+            index += 1
+
+        headers.append(
+            {
+                "title": title,
+                "company": company,
+                "start": start,
+                "end": None if end.casefold() in _CURRENT_WORDS else end,
+                "current": end.casefold() in _CURRENT_WORDS,
+                "highlights": highlights,
+            }
+        )
+    return headers
+
+
+def _strip_titles_for_field_matching(text: str) -> str:
+    """Remove job-header lines before job-field keywords are matched.
+
+    The rules below are industry terms, but the candidate's own job title is
+    full of them. "Multi-Agent Systems Architect & Founder" was read as the
+    Architecture industry, which would have had the agent targeting
+    architecture roles for a sales and media professional. A title states what
+    someone was called, not what industry they worked in, so any line that
+    parses as an employment header is dropped before matching.
+    """
+    kept: list[str] = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            kept.append(line)
+            continue
+        # "Title | Employer | dates" is the header shape these documents use,
+        # with the title first. Only the title is dropped: the employer is kept,
+        # because a company name is real evidence of the industry while a job
+        # title is only a label. Blanking the whole line lost "Architecture
+        # Studio" along with "Systems Architect".
+        if "|" in stripped and len(stripped) < 120:
+            # _DATE_TOKEN is a pattern string, not a compiled regex.
+            has_range = any(t in stripped for t in ("-", "\u2013", "\u2014"))
+            has_range = has_range or bool(re.search(_DATE_TOKEN, stripped))
+            if has_range:
+                segments = [s.strip() for s in stripped.split("|") if s.strip()]
+                kept.append(" | ".join(segments[1:]) if len(segments) > 1 else " ")
+                continue
+        header = None
+        for rx in _EMPLOYMENT_HEADER_RES:
+            header = rx.match(stripped)
+            if header is not None:
+                break
+        if header is not None:
+            employer = (header.groupdict().get("company") or "").strip()
+            kept.append(employer if employer else " ")
+            continue
+        kept.append(line)
+    return "\n".join(kept)
 
 
 def _extract_job_fields(text: str) -> list[str]:
     """Map source terms to broad job fields for the review panel."""
+    scannable = _strip_titles_for_field_matching(text)
     fields: list[str] = []
     seen: set[str] = set()
     for pattern, field in _JOB_FIELD_RULES:
-        if pattern.search(text) and field.casefold() not in seen:
+        if pattern.search(scannable) and field.casefold() not in seen:
             seen.add(field.casefold())
             fields.append(field)
     return fields
@@ -327,7 +719,7 @@ def ingest_resume(file_path: str | Path, hint: str | None = None) -> dict[str, A
     follows links, performs enrichment, or invents missing profile fields.
     """
     text = extract_resume_text(file_path, hint)
-    urls = _unique_matches(_URL_RE, text, _URL_CLEANUP)
+    urls = _extract_urls(text)
     emails = _unique_matches(_EMAIL_RE, text, _EMAIL_CLEANUP)
     skills = _extract_skills(text)
     job_fields = _extract_job_fields(text)
@@ -337,9 +729,12 @@ def ingest_resume(file_path: str | Path, hint: str | None = None) -> dict[str, A
         "text": text,
         "skills": skills,
         "job_fields": job_fields,
+        "employment_hints": _extract_employment_headers(text),
         "urls": urls,
         "portfolio_urls": urls,
         "urls_found": len(urls),
+        "stated_experience_years": _extract_stated_experience_years(text),
+        "phones": _extract_phones(text),
         "emails": emails,
         "emails_found": len(emails),
     }

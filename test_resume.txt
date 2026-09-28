@@ -1,0 +1,34 @@
+Jordan Ellis
+Senior Platform Engineer
+Richmond, VA | john@example.com | (804) 555-0142
+github.com/jellis | linkedin.com/in/jordanellis | jellis.dev
+
+SUMMARY
+Platform engineer with 9 years building distributed systems and developer
+infrastructure. Focused on reliability, ingestion throughput, and reducing
+operational toil.
+
+EXPERIENCE
+
+Lead Platform Engineer - Acme Systems (March 2021 - present)
+- Reduced p99 ingestion latency 42% by rewriting the event pipeline
+- Led migration of 40 microservices from VMs to Kubernetes across 3 AWS accounts
+- Managed 6 engineers; introduced Terraform as the IaC standard
+- Cut cloud spend 18% ($240k/yr) by right-sizing and commitment discounts
+
+Platform Engineer - Beta Labs (June 2017 - February 2021)
+- Built event pipeline sustaining 40k events/sec peak
+- Owned SRE on-call rotation for 3 services
+- Introduced CI with integration tests, raising coverage 31% to 84%
+
+Backend Engineer - Gamma Systems (Aug 2015 - May 2017)
+- Maintained Python and Django billing services
+
+EDUCATION
+B.S. Computer Science, State University, 2017
+
+CERTIFICATIONS
+AWS Certified Solutions Architect - Professional
+
+SKILLS
+Python, Go, Kubernetes, Terraform, AWS, PostgreSQL, Kafka, Docker, CI/CD, SRE

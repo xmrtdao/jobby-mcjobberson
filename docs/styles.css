@@ -595,3 +595,421 @@ nav a:hover { color: var(--primary); }
   .resume-drop-zone { max-width: 520px; }
   .parsed-profile-grid { grid-template-columns: repeat(3, 1fr); }
 }
+
+/* Dossier ---------------------------------------------------------------- */
+
+.dossier-grid .dossier-card { display: flex; flex-direction: column; }
+
+.dossier-name {
+  margin: 0 0 0.15rem;
+  color: var(--text);
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.dossier-role {
+  margin: 0 0 0.35rem;
+  color: var(--primary);
+  font-size: 0.85rem;
+}
+
+.dossier-muted {
+  margin: 0.2rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.dossier-summary {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+
+.dossier-confidence {
+  margin: 0.6rem 0 0;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.dossier-list {
+  margin: 0.25rem 0 0;
+  padding-left: 1.1rem;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+
+.dossier-list li { margin-bottom: 0.2rem; }
+
+.dossier-list li.dossier-muted {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  margin-left: -1.1rem;
+  font-style: italic;
+}
+
+.dossier-subhead {
+  margin: 1.75rem 0 0.5rem;
+  color: var(--text);
+  font-size: 0.95rem;
+  text-align: left;
+}
+
+.dossier-timeline {
+  display: grid;
+  gap: 0.75rem;
+  text-align: left;
+}
+
+.dossier-job {
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--primary);
+  border-radius: 12px;
+  background: var(--white);
+}
+
+.dossier-job h3 {
+  margin: 0;
+  color: var(--primary);
+  font-size: 0.88rem;
+}
+
+#dossier-body > .dossier-list { margin-top: 0; }
+
+/* Jobby — the agent panel ------------------------------------------------ */
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.jobby-status {
+  display: grid;
+  gap: 1rem;
+  margin: 1.5rem 0;
+  padding: 1.1rem 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--white);
+  text-align: left;
+}
+
+.jobby-status[hidden] { display: none; }
+
+.jobby-mission-label {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.jobby-mission-value {
+  margin: 0.15rem 0 0;
+  color: var(--primary);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.jobby-tracks,
+.jobby-cap {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.jobby-cap[data-kind="error"] { color: #b91c1c; }
+
+.jobby-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  align-items: center;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+.jobby-toggle {
+  display: inline-flex;
+  gap: 0.45rem;
+  align-items: center;
+  color: var(--text);
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.jobby-grid {
+  display: grid;
+  gap: 1.25rem;
+  margin-top: 1.25rem;
+  text-align: left;
+}
+
+.jobby-chat {
+  display: flex;
+  flex-direction: column;
+  min-height: 420px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--white);
+  overflow: hidden;
+}
+
+.jobby-log {
+  flex: 1;
+  max-height: 460px;
+  padding: 1rem;
+  overflow-y: auto;
+}
+
+.jobby-empty,
+.jobby-muted {
+  margin: 0.25rem 0;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-style: italic;
+}
+
+.jobby-msg {
+  margin-bottom: 0.9rem;
+  padding: 0.65rem 0.8rem;
+  border-radius: 12px;
+  background: #f7f8fa;
+}
+
+.jobby-msg-user {
+  background: #eef4ff;
+  border: 1px solid #d7e3ff;
+}
+
+.jobby-msg-jobby {
+  border: 1px solid var(--border);
+}
+
+.jobby-who {
+  display: block;
+  margin-bottom: 0.2rem;
+  color: var(--primary);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.jobby-text {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.87rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.jobby-tools {
+  margin: 0.45rem 0 0;
+  padding-top: 0.4rem;
+  border-top: 1px dashed var(--border);
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  line-height: 1.5;
+}
+
+.jobby-compose {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-end;
+  padding: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+.jobby-compose textarea {
+  flex: 1;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font: inherit;
+  font-size: 0.85rem;
+  resize: vertical;
+}
+
+.jobby-compose button {
+  padding: 0.55rem 1.1rem;
+  border: 0;
+  border-radius: 10px;
+  background: var(--primary);
+  color: #fff;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.jobby-compose button:disabled { opacity: 0.55; cursor: progress; }
+
+.jobby-hint {
+  margin: 0;
+  padding: 0 0.75rem 0.75rem;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.jobby-hint[data-kind="error"] { color: #b91c1c; }
+.jobby-hint[data-kind="working"] { color: var(--primary); }
+
+.jobby-side { display: grid; gap: 1rem; align-content: start; }
+
+.jobby-card {
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--white);
+}
+
+.jobby-card h3 {
+  margin: 0 0 0.6rem;
+  color: var(--primary);
+  font-size: 0.85rem;
+}
+
+.jobby-track,
+.jobby-action,
+.jobby-edit {
+  display: flex;
+  gap: 0.6rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.jobby-track:last-child,
+.jobby-action:last-child,
+.jobby-edit:last-child { border-bottom: 0; }
+
+.jobby-track-dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  margin-top: 0.35rem;
+  border-radius: 50%;
+  background: var(--border);
+}
+
+.jobby-track.is-active .jobby-track-dot { background: var(--primary); }
+.jobby-track:not(.is-active) { opacity: 0.55; }
+
+.jobby-track-name,
+.jobby-action-title,
+.jobby-edit-path {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.jobby-track-state,
+.jobby-action-detail,
+.jobby-edit-reason,
+.jobby-edit-meta {
+  margin: 0.1rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.jobby-action-detail {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.jobby-action-prio,
+.jobby-edit-verb {
+  flex: 0 0 auto;
+  align-self: flex-start;
+  padding: 0.1rem 0.35rem;
+  border-radius: 6px;
+  background: #eef4ff;
+  color: var(--primary);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.jobby-edit-meta { font-size: 0.66rem; }
+
+@media (min-width: 900px) {
+  .jobby-grid { grid-template-columns: 1.4fr 1fr; }
+}
+
+/* Google connection -------------------------------------------------------- */
+
+#google-hint[data-kind="error"] { color: #b91c1c; font-style: normal; }
+#google-hint[data-kind="ok"] { color: #15803d; font-style: normal; }
+#google-hint[data-kind="working"] { color: var(--primary); font-style: normal; }
+
+.google-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+}
+
+.google-actions[hidden] { display: none; }
+
+.google-btn {
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--white);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.google-btn:hover { border-color: var(--primary); color: var(--primary); }
+.google-btn[hidden] { display: none; }
+
+.google-btn-primary {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #fff;
+  font-weight: 600;
+}
+
+.google-btn-primary:hover { color: #fff; opacity: 0.9; }
+
+.google-btn-quiet { color: var(--text-muted); }
+
+#google-detail {
+  margin-top: 0.7rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--border);
+}
+
+#google-detail[hidden] { display: none; }
+
+.google-list { max-height: 220px; overflow-y: auto; }
+
+.google-row {
+  margin: 0.2rem 0;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+

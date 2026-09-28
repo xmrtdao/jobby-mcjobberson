@@ -69,6 +69,82 @@
           </article>
         </div>
       </section>
+      <section class="parsed-profile-section" id="dossier-panel" aria-label="AI candidate dossier" aria-live="polite" hidden>
+        <div class="section-heading">
+          <p class="eyebrow">AI dossier</p>
+          <h2 id="dossier-heading">Building the candidate dossier</h2>
+          <p>Every field is taken from the resume itself. Anything the model could not confirm is listed under <em>Not stated in resume</em> rather than guessed, and anything it flagged for a second look is called out.</p>
+        </div>
+        <div id="dossier-body"></div>
+      </section>
+    </section>
+
+    <section class="section" id="jobby" aria-label="Jobby McJobberson">
+      <div class="section-heading">
+        <p class="eyebrow">Your agent</p>
+        <h2>Jobby McJobberson</h2>
+        <p>Your career is the mission. Jobby works your corner: it reads the market, decides what to chase, writes the outreach, and keeps the pipeline moving until income is secured — and after.</p>
+      </div>
+
+      <div class="jobby-status" id="jobby-status" hidden>
+        <div class="jobby-mission">
+          <p class="jobby-mission-label">Mission</p>
+          <p class="jobby-mission-value" id="jobby-mission">—</p>
+        </div>
+        <div class="jobby-tracks" id="jobby-tracks"></div>
+        <div class="jobby-controls">
+          <label class="jobby-toggle">
+            <input type="checkbox" id="jobby-autonomy" checked>
+            <span>Send outreach on my own</span>
+          </label>
+          <label class="jobby-toggle">
+            <input type="checkbox" id="jobby-kill-switch">
+            <span>Emergency stop</span>
+          </label>
+          <p class="jobby-cap" id="jobby-cap">—</p>
+        </div>
+      </div>
+
+      <div class="jobby-grid">
+        <div class="jobby-chat">
+          <div class="jobby-log" id="jobby-log" role="log" aria-live="polite" aria-label="Conversation with Jobby">
+            <p class="jobby-empty" id="jobby-empty">Upload a resume and Jobby takes it from there.</p>
+          </div>
+          <form class="jobby-compose" id="jobby-form">
+            <label class="visually-hidden" for="jobby-input">Message Jobby</label>
+            <textarea id="jobby-input" rows="2" placeholder="Ask Jobby anything, or tell it something new about you…" autocomplete="off"></textarea>
+            <button type="submit" id="jobby-send">Send</button>
+          </form>
+          <p class="jobby-hint" id="jobby-hint">Jobby writes to your dossier when you tell it something. Every change is logged and you can see it below.</p>
+        </div>
+
+        <aside class="jobby-side">
+          <div class="jobby-card" id="google-card">
+            <h3>Google account</h3>
+            <div id="google-panel">
+              <p class="jobby-muted" id="google-hint">Checking…</p>
+            </div>
+            <div class="google-actions" id="google-actions" hidden>
+              <button type="button" id="google-drive-btn" class="google-btn">Browse Drive</button>
+              <button type="button" id="google-replies-btn" class="google-btn">Check replies</button>
+              <button type="button" id="google-disconnect" class="google-btn google-btn-quiet">Disconnect</button>
+            </div>
+            <div id="google-detail" hidden></div>
+          </div>
+          <div class="jobby-card">
+            <h3>Your tracks</h3>
+            <div id="jobby-track-list"></div>
+          </div>
+          <div class="jobby-card">
+            <h3>The plan</h3>
+            <div id="jobby-plan"></div>
+          </div>
+          <div class="jobby-card">
+            <h3>What Jobby changed</h3>
+            <div id="jobby-edits"></div>
+          </div>
+        </aside>
+      </div>
     </section>
 
     <section class="section" id="funnel">
@@ -234,5 +310,6 @@
   </div>
 
   <script src="app.js" defer></script>
+<script src="jobby.js" defer></script>
 </body>
 </html>
