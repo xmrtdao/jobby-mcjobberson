@@ -95,6 +95,24 @@
           <h2 id="dossier-heading">Building the candidate dossier</h2>
           <p>Every field is taken from the resume itself. Anything the model could not confirm is listed under <em>Not stated in resume</em> rather than guessed, and anything it flagged for a second look is called out.</p>
         </div>
+        <!-- The build takes 10-90s. The stage list is here because a bare
+             indeterminate bar tells a waiting candidate nothing: naming the six
+             steps, and marking the ones already done, is what makes the wait
+             legible. progress is filled from the server's own stage, not from a
+             timer, so the bar cannot run ahead of the work. -->
+        <div class="dossier-progress" id="dossier-progress" hidden>
+          <div class="dp-head">
+            <p class="dp-stage" id="dp-stage" aria-live="polite">Starting</p>
+            <p class="dp-count" id="dp-count"></p>
+          </div>
+          <div class="dp-track" id="dp-track" role="progressbar"
+               aria-valuemin="0" aria-valuemax="6" aria-valuenow="0"
+               aria-label="Dossier build progress">
+            <div class="dp-fill" id="dp-fill"></div>
+          </div>
+          <ol class="dp-steps" id="dp-steps"></ol>
+          <p class="dp-note" id="dp-note"></p>
+        </div>
         <div id="dossier-body"></div>
       </section>
 

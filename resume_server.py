@@ -1294,16 +1294,27 @@ def _pin_experience_years(dossier: dict[str, Any], ingested: dict[str, Any]) -> 
     dossier["not_stated"] = gaps
 
 
-def _build_dossier(text: str, filename: str, ingested: dict[str, Any]) -> dict[str, Any]:
+def _build_dossier(
+    text: str,
+    filename: str,
+    ingested: dict[str, Any],
+    on_progress: Any = None,
+) -> dict[str, Any]:
     """Run the model passes, then lay the deterministic floor underneath.
 
     Three short passes rather than one long one: a single request for a whole
     profile is where the model starts transposing dates and inventing
     employers. Split by concern it stays on task, and each pass is small enough
     to be retried when it answers with prose instead of JSON.
+
+    on_progress is called with a stage label before each step so the browser can
+    show what is happening rather than an indeterminate spinner. It is a
+    parameter rather than a global so this stays callable from a test without a
+    job in the store, and so a caller that does not care pays nothing.
     """
     identity = history = interpret = {}
     failures: list[str] = []
+    report = on_progress or (lambda stage, note="": None)
 
     for label, system, schema, run in (
         ("identity", _IDENTITY_SYSTEM, _IDENTITY_SCHEMA, "identity"),
@@ -1327,6 +1338,7 @@ def _build_dossier(text: str, filename: str, ingested: dict[str, Any]) -> dict[s
                 f"{text}\n"
                 "=== END RESUME ===\n"
             )
+        report(run)
         try:
             result = _llm_json(system, prompt, allow_text=(run == "interpret"))
         except ModelUnavailable as error:
@@ -1369,6 +1381,7 @@ def _build_dossier(text: str, filename: str, ingested: dict[str, Any]) -> dict[s
             dossier[key] = dossier.get(key) or []
 
     dossier = _apply_deterministic_floor(dossier, ingested)
+    report("reconcile")
     dossier["sourceFilename"] = filename
     if failures:
         _add_flag(dossier, (
@@ -1434,11 +1447,57 @@ def _dossier_job_get(request_id: str) -> dict[str, Any] | None:
         return _DOSSIER_JOBS.get(request_id)
 
 
+# The stages a candidate is shown while the dossier is built. The order is the
+# order the work actually happens in, and the wording is what the browser puts
+# in front of the user, so it is defined here rather than in the client: the
+# server knows what it is doing, and a progress bar that disagrees with the work
+# is worse than no bar.
+_DOSSIER_STAGES: tuple[tuple[str, str], ...] = (
+    ("identity", "Reading your details out of the document"),
+    ("history", "Pulling the job history apart"),
+    ("interpret", "Working out what that history supports"),
+    ("reconcile", "Cross-checking the dates against the document"),
+    ("verify", "Deciding what it can and cannot claim"),
+    ("onboard", "Building your tracks and your plan"),
+)
+_DOSSIER_STAGE_TOTAL = len(_DOSSIER_STAGES)
+_STAGE_INDEX = {label: i for i, (label, _) in enumerate(_DOSSIER_STAGES, start=1)}
+
+
+def _dossier_progress(request_id: str, stage: str, note: str = "") -> None:
+    """Publish what the build is currently doing, for the progress bar.
+
+    Read-modify-write under the lock rather than _dossier_job_put, because
+    put() replaces the whole entry and would discard the status and profile
+    already recorded. A finished job is left alone: a straggling update must not
+    resurrect a completed build, which would leave the browser polling forever.
+    """
+    index = _STAGE_INDEX.get(stage)
+    if index is None:
+        return
+    _dossier_job_store()
+    with _DOSSIER_JOBS_LOCK:
+        job = _DOSSIER_JOBS.get(request_id)
+        if not job or job.get("status") in ("done", "error"):
+            return
+        job["progress"] = {
+            "stage": stage,
+            "label": _DOSSIER_STAGES[index - 1][1],
+            "index": index,
+            "total": _DOSSIER_STAGE_TOTAL,
+            "note": note,
+        }
+
+
 def _run_dossier_job(
     request_id: str, text: str, filename: str, ingested: dict[str, Any], cookie: str | None
 ) -> None:
     try:
-        profile = _build_dossier(text, filename, ingested)
+        profile = _build_dossier(
+            text, filename, ingested,
+            on_progress=lambda stage, note="": _dossier_progress(request_id, stage, note),
+        )
+        _dossier_progress(request_id, "verify")
         if not _dossier_is_useful(profile):
             # Every model pass came back empty and the deterministic floor found
             # nothing either. Reporting "done" is the one outcome that must not
@@ -1455,13 +1514,18 @@ def _run_dossier_job(
                 ),
             })
             return
-        _dossier_job_put(request_id, {"status": "done", "profile": profile})
+        # Onboarding runs before the job is marked done. It used to be marked
+        # done first and then re-written with the onboarding result, which let
+        # the browser render a dossier whose tracks and plan had not arrived
+        # yet - and made the "onboard" stage unshowable, because progress is
+        # never recorded against a finished job. The tracks and the plan are
+        # part of what the candidate is waiting for, so the bar now covers them
+        # and the dossier appears once, complete.
+        _dossier_progress(request_id, "onboard")
         onboarding = _onboard_with_jobby(profile, filename, cookie)
         if isinstance(onboarding, dict) and onboarding:
-            _dossier_job_put(request_id, {
-                "status": "done",
-                "profile": {**profile, "onboarding": onboarding},
-            })
+            profile = {**profile, "onboarding": onboarding}
+        _dossier_job_put(request_id, {"status": "done", "profile": profile})
     except Exception as error:  # noqa: BLE001 - a job must never kill the thread
         _dossier_job_put(request_id, {
             "status": "error",
@@ -1633,7 +1697,21 @@ def create_server(
                 })
                 return
             if job.get("status") == "processing":
-                self._write_json(202, {"status": "processing"})
+                # The progress block is what the browser's bar is built from, so
+                # it rides on the 202 rather than needing a second endpoint. A
+                # job that has not reported a stage yet still returns a valid
+                # one, because a bar that starts at 0% on the first poll and
+                # then jumps reads as a stall.
+                progress = job.get("progress")
+                if not isinstance(progress, dict):
+                    progress = {
+                        "stage": "identity",
+                        "label": _DOSSIER_STAGES[0][1],
+                        "index": 1,
+                        "total": _DOSSIER_STAGE_TOTAL,
+                        "note": "",
+                    }
+                self._write_json(202, {"status": "processing", "progress": progress})
                 return
             self._write_json(200, {"status": "done", "profile": job.get("profile")})
 

@@ -250,14 +250,109 @@ function renderDossierUnavailable(message) {
   dossierPanel.hidden = false;
 }
 
+/* ------------------------------------------------- dossier build progress */
+// Driven by the server's own stage, never by a client timer. A bar that advances
+// on its own schedule eventually outruns the work and sits at 90% for a minute,
+// which is the opposite of reassuring: the candidate would be watching a lie.
+const progressBlock = document.getElementById('dossier-progress');
+const progressStage = document.getElementById('dp-stage');
+const progressCount = document.getElementById('dp-count');
+const progressTrack = document.getElementById('dp-track');
+const progressFill = document.getElementById('dp-fill');
+const progressSteps = document.getElementById('dp-steps');
+const progressNote = document.getElementById('dp-note');
+
+// Mirrors the server's _DOSSIER_STAGES order, so the list can be drawn on the
+// first paint before any stage has been reported. The server's wording
+// overwrites these on every update, so the two cannot drift into contradicting
+// each other on a live build.
+const progressLabels = [
+  'Read your details',
+  'Pull the job history apart',
+  'Work out what it supports',
+  'Cross-check the dates',
+  'Decide what it can claim',
+  'Build your tracks and plan',
+];
+let progressStartedAt = Date.now();
+let progressTotal = progressLabels.length;
+
+function progressStepsTo(index, total) {
+  if (!progressSteps) return;
+  const want = total || progressLabels.length;
+  while (progressSteps.children.length > want) {
+    progressSteps.removeChild(progressSteps.lastElementChild);
+  }
+  while (progressSteps.children.length < want) {
+    progressSteps.appendChild(el('li', 'dp-step'));
+  }
+  for (let i = 0; i < want; i++) {
+    const step = progressSteps.children[i];
+    const state = i < index - 1 ? 'done' : (i === index - 1 ? 'active' : 'todo');
+    if (step.dataset.state === state) continue;
+    step.dataset.state = state;
+    const mark = state === 'done' ? '\u2713 ' : (state === 'active' ? '\u25b8 ' : '\u00b7 ');
+    step.textContent = mark + (progressLabels[i] || '');
+  }
+}
+
+function renderProgress(progress) {
+  if (!progressBlock || !progress) return;
+  progressBlock.hidden = false;
+  const total = Number(progress.total) || progressTotal;
+  const index = Math.min(Math.max(Number(progress.index) || 1, 1), total);
+  progressTotal = total;
+
+  if (progressStage && progressStage.textContent !== progress.label) {
+    progressStage.textContent = progress.label || 'Working';
+  }
+  if (progressCount) progressCount.textContent = index + ' of ' + total;
+  if (progressTrack) {
+    progressTrack.setAttribute('aria-valuemax', String(total));
+    progressTrack.setAttribute('aria-valuenow', String(index));
+  }
+  if (progressFill) {
+    // Never 100% before the last stage lands. The final jump belongs to the real
+    // render, so a slow final stage stays visibly unfinished rather than
+    // pretending to be done.
+    const pct = index >= total ? 100 : Math.round(((index - 0.35) / total) * 100);
+    progressFill.style.width = Math.max(4, Math.min(pct, 97)) + '%';
+  }
+  progressStepsTo(index, total);
+
+  if (progressNote) {
+    const seconds = Math.round((Date.now() - progressStartedAt) / 1000);
+    progressNote.textContent = seconds < 10
+      ? 'Usually under a minute. The dossier fills in on its own \u2014 you can keep reading.'
+      : seconds + ' seconds so far, still working. The dossier fills in on its own.';
+  }
+}
+
 function showDossierPending() {
   if (!dossierPanel || !dossierBody) return;
   dossierBody.replaceChildren();
-  dossierBody.appendChild(el('p', 'dossier-muted',
-    'Reading the resume and confirming what it actually states. This usually takes under a minute.'));
+  progressStartedAt = Date.now();
+  progressTotal = progressLabels.length;
+  progressStepsTo(1, progressTotal);
+  if (progressStage) progressStage.textContent = 'Starting';
+  if (progressCount) progressCount.textContent = '0 of ' + progressTotal;
+  if (progressFill) progressFill.style.width = '4%';
+  if (progressTrack) {
+    progressTrack.setAttribute('aria-valuemax', String(progressTotal));
+    progressTrack.setAttribute('aria-valuenow', '0');
+  }
+  if (progressNote) {
+    progressNote.textContent = 'Usually under a minute. The dossier fills in on its own \u2014 you can keep reading.';
+  }
+  if (progressBlock) progressBlock.hidden = false;
   dossierHeading.textContent = 'Building the candidate dossier';
   dossierPanel.hidden = false;
 }
+
+function hideDossierProgress() {
+  if (progressBlock) progressBlock.hidden = true;
+}
+
 
 // dossierList returns null when there is nothing to show, so appending goes
 // through this rather than relying on each call site re-checking.
@@ -281,14 +376,22 @@ function pollDossier(requestId) {
       const body = await response.json().catch(() => ({}));
       if (body.status === 'done') {
         setStatus('Dossier ready.', 'success');
+        // The bar is taken down only once the dossier is genuinely in hand.
+        hideDossierProgress();
         renderDossier(body.profile);
         return;
       }
       if (body.status === 'processing') {
+        // Fed on every tick, including one that carries no progress block, so
+        // a slow stage still refreshes its elapsed note rather than freezing at
+        // whatever the last real stage left behind.
+        renderProgress(body.progress);
         dossierTimer = setTimeout(tick, 1500);
         return;
       }
       setStatus('Resume parsed. ' + (body.error || 'Dossier unavailable.'), 'error');
+      // A failed build takes the bar down too, or it would sit there forever.
+      hideDossierProgress();
       renderDossierUnavailable(body.error || 'The dossier could not be built.');
     } catch (error) {
       // A dropped poll is not a failure; keep trying until the job expires.

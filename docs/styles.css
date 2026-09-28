@@ -723,6 +723,132 @@ nav a:hover { color: var(--primary); }
   .site-footer { padding: 4rem 2rem; }
 }
 
+/* --- Dossier build progress ----------------------------------------------
+ * Shown while the dossier is constructed, which is 10-90s. Two layers: the bar
+ * itself, and the list of stages. The list is the part that reassures - naming
+ * the six steps and marking the finished ones is what turns an unexplained wait
+ * into bounded work, where a bar alone just says "something is happening".
+ */
+.dossier-progress {
+  margin: 0 0 1.75rem;
+  padding: 1.5rem 1.5rem 1.35rem;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--white);
+  box-shadow: 0 14px 34px -24px rgba(15, 23, 42, 0.4);
+  /* The section this sits in is text-align: center, which is right for the
+   * rendered dossier cards and wrong here: a progress readout centred in a card
+   * has its bar and its stage names drifting out of alignment with each other,
+   * and a column of steps reads as a list of nothing in particular. */
+  text-align: left;
+}
+
+.dp-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.7rem;
+}
+
+.dp-stage {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.dp-count {
+  flex: none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* The track. Overflow hidden so the fill's sheen is clipped to the bar rather
+ * than spilling past its end when the build is nearly finished. */
+.dp-track {
+  position: relative;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--accent);
+  overflow: hidden;
+}
+
+.dp-fill {
+  height: 100%;
+  width: 4%;
+  border-radius: 999px;
+  background: var(--primary);
+  transition: width 700ms cubic-bezier(0.22, 1, 0.36, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+/* The sheen. Without it a 60s wait looks like a frozen page; with it, the bar
+ * is visibly alive even between stage changes. */
+.dp-fill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.55) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  animation: dp-sheen 1.6s ease-in-out infinite;
+}
+
+@keyframes dp-sheen {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.dp-steps {
+  list-style: none;
+  margin: 1.1rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.dp-step {
+  position: relative;
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  transition: color 200ms ease;
+}
+
+/* State is carried by the text mark the script writes (tick, arrow, middot), not
+ * only by colour, so it survives colour-blindness and a no-motion rendering. */
+.dp-step[data-state="todo"] { color: var(--text-muted); opacity: 0.55; }
+.dp-step[data-state="active"] { color: var(--text); font-weight: 600; }
+.dp-step[data-state="done"] { color: var(--text-muted); }
+
+/* No separate pulsing dot. An absolutely positioned one at left: -0.85rem sits
+ * outside the list item's box, so in the centred section it floated at the card
+ * edge, detached from the step it belonged to. The arrow the script already
+ * writes into the line marks the active step, and the bar's sheen carries the
+ * "still working" signal on its own. */
+
+.dp-note {
+  margin-top: 1.1rem;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+/* Motion off: the fill width and the tick marks still report the state, so
+ * nothing is lost by removing the movement - which matters here because this
+ * animation runs for up to ninety seconds. */
+@media (prefers-reduced-motion: reduce) {
+  .dp-fill { transition: none; }
+  .dp-fill::after { animation: none; }
+}
+
+
 /* --- Resume ingestion (mobile first) --- */
 .resume-drop-zone {
   width: 100%;

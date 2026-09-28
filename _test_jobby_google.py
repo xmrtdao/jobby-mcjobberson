@@ -103,7 +103,7 @@ for qs in ["", "?error=access_denied", "?code=abc&state=nope", "?code=abc", "?st
     status, body = call(RELAY, "GET", "/api/jobby/google/callback" + qs, allow_redirect=True)
     check(f"callback{qs or ' (bare)'} redirects", status in (301, 302, 303, 307, 308), (status, body))
     check(f"callback{qs or ' (bare)'} goes to the portal",
-          "jobby.mobilemonero.com" in str(body.get("_redirect", "")), body)
+          "jobbymcjobberson.com" in str(body.get("_redirect", "")), body)
     check(f"callback{qs or ' (bare)'} reports a result flag",
           "google=" in str(body.get("_redirect", "")), body)
     check(f"callback{qs or ' (bare)'} body has no token", "ya29." not in json.dumps(body), body)
@@ -154,7 +154,7 @@ status, body = call(PORTAL, "GET", "/api/jobby/google/auth-url", allow_redirect=
 check("portal proxies auth-url", status in (200, 503), (status, body))
 status, body = call(PORTAL, "GET", "/api/jobby/google/callback?error=access_denied", allow_redirect=True)
 check("portal proxies the callback redirect", status in (301, 302, 303, 307, 308), (status, body))
-check("portal forwards the redirect target", "jobby.mobilemonero.com" in str(body.get("_redirect", "")), body)
+check("portal forwards the redirect target", "jobbymcjobberson.com" in str(body.get("_redirect", "")), body)
 
 print("\n=== an anonymous request gets its own empty client, never someone else's ===")
 # /status deliberately mints a session rather than 401ing, so the portal panel
