@@ -20,34 +20,54 @@
       <a href="#funnel">Funnel</a>
       <a href="#tracks">Tracks</a>
       <a href="#audit">Audit</a>
-      <button class="button button-small" type="button" data-open-onboarding>Get started</button>
+      <a class="button button-small" href="#resume-drop-zone">Get started</a>
     </nav>
   </header>
 
   <main id="top">
     <section class="hero">
-      <div class="hero-copy">
-        <p class="eyebrow">Precision Career Orchestration</p>
-        <h1>Prepare. Personalize. Track. Apply with control.</h1>
-        <p class="lede">A sophisticated orchestration layer that transforms resumes, contacts, and opportunities into an auditable, high-conversion job search system.</p>
-        <div class="hero-actions">
-          <button class="button" type="button" data-open-onboarding>Start onboarding</button>
-          <a class="button secondary" href="#tracks">View tracks</a>
+      <!-- The scene is a background layer, not a card competing with the copy.
+           It sits behind everything and is scrimmed so the text stays legible. -->
+      <div class="hero-bg" id="hero-scene-host">
+        <canvas id="hero-scene" role="img" aria-label="An animated illustration of Jobby working: it scans a job board and picks a listing, rewrites your resume and extracts your skills, fills in an application form and attaches your CV, then stops on a question it will not guess the answer to and hands it back to you."></canvas>
+        <div class="hero-scrim"></div>
+        <div class="hero-scene-bar">
+          <span class="hero-scene-label" id="hero-scene-label">Reading the market</span>
+          <button type="button" id="hero-scene-toggle" class="hero-scene-toggle" aria-pressed="true">Pause animation</button>
         </div>
+        <p class="visually-hidden">The animation repeats the four steps listed in the hero. It can be paused with the button beside it.</p>
       </div>
-      <section class="resume-drop-zone" id="resume-drop-zone" aria-label="Resume ingestion">
-        <div class="drop-topline">
-          <span>Resume parsing</span>
-          <strong>Drop a resume to build a source-derived profile</strong>
+
+      <div class="hero-inner">
+        <div class="hero-copy">
+          <p class="eyebrow">A personal agent for your job search</p>
+          <h1>It does the work. You stay in charge.</h1>
+          <p class="lede">Upload your resume and Jobby takes it from there: it reads the market, decides what is worth chasing, writes the outreach, fills in the applications, and comes back to you on the ones it will not guess at.</p>
+          <ul class="hero-points">
+            <li>Reads your resume properly, then keeps it current as you correct it</li>
+            <li>Sources the roles and writes the message for each one</li>
+            <li>Applies in your own browser, stopping at anything it cannot know</li>
+          </ul>
         </div>
-        <div class="drop-area" id="resume-drop-area" role="button" tabindex="0" aria-controls="resume-file">
-          <div class="drop-icon" aria-hidden="true">⇩</div>
-          <p class="drop-label"><strong>Drop your resume here</strong></p>
-          <p class="drop-hint">PDF, DOCX, or TXT · up to 10 MB</p>
-          <input type="file" id="resume-file" accept=".pdf,.docx,.txt" aria-label="Choose a resume">
-        </div>
-        <p class="drop-status" id="resume-status" role="status" aria-live="polite"></p>
-      </section>
+
+        <section class="resume-drop-zone" id="resume-drop-zone" aria-label="Resume ingestion">
+          <div class="drop-topline">
+            <span>Resume parsing</span>
+            <strong>Drop a resume to build a source-derived profile</strong>
+          </div>
+          <div class="drop-area" id="resume-drop-area" role="button" tabindex="0" aria-controls="resume-file">
+            <div class="drop-icon" aria-hidden="true">⇩</div>
+            <p class="drop-label"><strong>Drop your resume here</strong></p>
+            <p class="drop-hint">PDF, DOCX, or TXT · up to 10 MB</p>
+            <input type="file" id="resume-file" accept=".pdf,.docx,.txt" aria-label="Choose a resume">
+          </div>
+          <p class="drop-status" id="resume-status" role="status" aria-live="polite"></p>
+        </section>
+      </div>
+    </section>
+
+    <!-- Results sit below the hero, on the flat page. Inside it they grew
+         the section without bound and were laid over the moving background. -->
       <section class="parsed-profile-section" id="parsed-profile" aria-label="Parsed resume profile" hidden>
         <div class="section-heading">
           <p class="eyebrow">Source-derived profile</p>
@@ -77,7 +97,6 @@
         </div>
         <div id="dossier-body"></div>
       </section>
-    </section>
 
     <section class="section" id="jobby" aria-label="Jobby McJobberson">
       <div class="section-heading">
@@ -149,30 +168,30 @@
 
     <section class="section" id="funnel">
       <div class="section-heading">
-        <p class="eyebrow">Architected for Professionalism</p>
-        <h2>A branded funnel, a tighter scope.</h2>
-        <p>Jobby provides the critical preparation layer that separates raw leads from successful applications. While fleet services handle the final delivery and ATS interaction, Jobby ensures every outbound signal is normalized, personalized, and audited.</p>
+        <p class="eyebrow">What it actually does</p>
+        <h2>Four things, done properly.</h2>
+        <p>Most job search tools are a template library and a button. Jobby holds your professional identity in one place, keeps it honest, and does the repetitive part of the search on your behalf.</p>
       </div>
       <div class="feature-grid">
         <article class="feature-card">
           <span class="icon">01</span>
-          <h3>Asset Packaging</h3>
-          <p>Maintain a single, canonical version of the professional identity—resume, contact block, and target roles—to ensure absolute consistency across all tracks.</p>
+          <h3>One version of you</h3>
+          <p>Your resume, contact details, roles and skills live in a single dossier. Correct it once and every application after that is right. Tell Jobby something new in plain words and it writes it in, with your name on the change.</p>
         </article>
         <article class="feature-card">
           <span class="icon">02</span>
-          <h3>Precision Personalization</h3>
-          <p>Generate high-conversion messaging from canonical templates, ensuring each outreach is tailored to the recipient without risking data fabrication.</p>
+          <h3>It finds the work</h3>
+          <p>Jobby searches for roles that fit what you have actually done, not keywords you once typed. It reads the posting, works out whether you are a real fit, and tells you plainly when you are not.</p>
         </article>
         <article class="feature-card">
           <span class="icon">03</span>
-          <h3>Opportunity Routing</h3>
-          <p>Automated classification of leads into specific tracks—Consultancy, Temporary, or Full-time—to apply the correct engagement strategy for each.</p>
+          <h3>It writes and sends</h3>
+          <p>A message written for that company and that role, from your dossier rather than from a template. You approve it, or you let Jobby send within a daily cap you set. Every message is logged.</p>
         </article>
         <article class="feature-card">
           <span class="icon">04</span>
-          <h3>Application Command</h3>
-          <p>A centralized control plane to track outreach status, suppression decisions, and next actions, providing full visibility into the search pipeline.</p>
+          <h3>It applies for you</h3>
+          <p>It fills in the form in your own browser and attaches your CV. If the form asks something your dossier does not answer, it stops and asks you instead of inventing an answer.</p>
         </article>
       </div>
     </section>
@@ -214,25 +233,26 @@
     <section class="section" id="audit">
       <div class="audit-panel">
         <div>
-          <p class="eyebrow">Audit-First Intelligence</p>
-          <h2>Never invent a contact. Never hide a decision.</h2>
-          <p>Professional integrity is our core constraint. Every recipient record is normalized, deduplicated, and audited before reaching the delivery layer. Unknown contacts stay unknown; suppression decisions are transparent and permanent.</p>
+          <p class="eyebrow">The part that matters</p>
+          <h2>It will not make something up.</h2>
+          <p>An agent that invents a fact about you is worse than no agent, because you find out at the interview. Jobby only states what your resume or your own corrections establish. Anything it cannot confirm is listed as unconfirmed, and anything that looks wrong on your resume is flagged so you can fix it.</p>
         </div>
         <ul class="check-list">
-          <li>Strict normalization without mutating source input.</li>
-          <li>Preservation of missing/unverified contacts as unknown.</li>
-          <li>Multi-layer suppression (Identity, Verified Email, and Explicit Consent).</li>
-          <li>Automated discard of malformed records with detailed audit trails.</li>
+          <li>No employer, title, date or number that is not in your record.</li>
+          <li>Gaps stay gaps until you fill them — Jobby will not close them for you.</li>
+          <li>Every change to your profile is logged with who made it.</li>
+          <li>Every message sent is kept, with the time and the recipient.</li>
+          <li>A daily send cap, and a stop button that takes effect immediately.</li>
         </ul>
       </div>
     </section>
 
     <section class="section start" id="start">
       <div class="start-card">
-        <p class="eyebrow">Client onboarding</p>
-        <h2>Ready to turn the search into a system?</h2>
-        <p>Experience the orchestration layer. Use this portal to define your professional identity, integrate your opportunities, and launch a controlled, auditable outreach engine.</p>
-        <button class="button" type="button" data-open-onboarding>Start onboarding</button>
+        <p class="eyebrow">Start here</p>
+        <h2>Drop your resume in.</h2>
+        <p>There is no account to create and no form to fill in. Upload your resume at the top of this page and Jobby will have read it, worked out which routes your background supports, and written you a plan before you have finished your coffee.</p>
+        <a class="button" href="#resume-drop-zone">Go to the upload</a>
       </div>
     </section>
   </main>
@@ -242,74 +262,8 @@
     <a href="https://github.com/xmrtdao/jobby-mcjobberson">Repository</a>
   </footer>
 
-  <div id="onboarding-overlay">
-    <div class="onboarding-modal">
-      <div class="onboarding-step active" data-step="1">
-        <p class="eyebrow">Step 01</p>
-        <h2>Professional Profile</h2>
-        <p>Define the identity and target roles for this search.</p>
-        <div class="form-group">
-          <label>Full Name</label>
-          <input type="text" id="onboard-name" placeholder="e.g. Jane Doe">
-        </div>
-        <div class="form-group">
-          <label>Target Job Titles</label>
-          <input type="text" id="onboard-roles" placeholder="e.g. Senior Engineer, Systems Architect">
-        </div>
-        <div class="modal-nav">
-          <div></div>
-          <button class="button" type="button" data-onboarding-step="2">Continue</button>
-        </div>
-      </div>
-
-      <div class="onboarding-step" data-step="2">
-        <p class="eyebrow">Step 02</p>
-        <h2>The Package</h2>
-        <p>Upload or link the canonical documents.</p>
-        <div class="form-group">
-          <label>Resume / CV URL</label>
-          <input type="url" id="onboard-resume" placeholder="https://...">
-        </div>
-        <div class="form-group">
-          <label>Cover Letter Template URL</label>
-          <input type="url" id="onboard-cover" placeholder="https://...">
-        </div>
-        <div class="modal-nav">
-          <button class="button secondary" type="button" data-onboarding-step="1">Back</button>
-          <button class="button" type="button" data-onboarding-step="3">Continue</button>
-        </div>
-      </div>
-
-      <div class="onboarding-step" data-step="3">
-        <p class="eyebrow">Step 03</p>
-        <h2>Opportunity Sources</h2>
-        <p>Where are the leads coming from?</p>
-        <div class="form-group">
-          <label>Primary Lead Source</label>
-          <textarea id="onboard-sources" rows="3" placeholder="e.g. LinkedIn, Industry Newsletters, Direct Referrals"></textarea>
-        </div>
-        <div class="modal-nav">
-          <button class="button secondary" type="button" data-onboarding-step="2">Back</button>
-          <button class="button" type="button" data-onboarding-step="4">Continue</button>
-        </div>
-      </div>
-
-      <div class="onboarding-step" data-step="4">
-        <p class="eyebrow">Step 04</p>
-        <h2>Ready for Launch</h2>
-        <p>Confirm your details and activate the command center.</p>
-        <div id="summary-box">
-          <!-- Summary injected by JS -->
-        </div>
-        <div class="modal-nav">
-          <button class="button secondary" type="button" data-onboarding-step="3">Back</button>
-          <button class="button" type="button" data-onboarding-finish>Finish &amp; Activate</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <script src="app.js" defer></script>
+<script src="hero-scene.js" defer></script>
 <script src="jobby.js" defer></script>
 </body>
 </html>

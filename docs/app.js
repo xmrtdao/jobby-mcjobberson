@@ -2,7 +2,6 @@ const dropZone = document.getElementById('resume-drop-zone');
 const dropArea = document.getElementById('resume-drop-area');
 const fileInput = document.getElementById('resume-file');
 const statusElement = document.getElementById('resume-status');
-const onboardingOverlay = document.getElementById('onboarding-overlay');
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 const SUPPORTED_TYPES = new Set([
   'application/pdf',
@@ -299,58 +298,6 @@ function pollDossier(requestId) {
   dossierTimer = setTimeout(tick, 1200);
 }
 
-function openOnboarding() {
-  if (onboardingOverlay) onboardingOverlay.style.display = 'flex';
-}
-
-function nextStep(stepNum) {
-  document.querySelectorAll('.onboarding-step').forEach(step => {
-    step.classList.remove('active');
-  });
-  const next = document.querySelector(`.onboarding-step[data-step="${stepNum}"]`);
-  if (!next) return;
-  next.classList.add('active');
-  if (stepNum === 4) updateSummary();
-}
-
-function updateSummary() {
-  const summary = document.getElementById('summary-box');
-  if (!summary) return;
-  summary.replaceChildren();
-  const values = [
-    ['Name', document.getElementById('onboard-name')?.value],
-    ['Roles', document.getElementById('onboard-roles')?.value],
-    ['Resume', document.getElementById('onboard-resume')?.value],
-    ['Sources', document.getElementById('onboard-sources')?.value],
-  ];
-  values.forEach(([label, value]) => {
-    const labelNode = document.createElement('strong');
-    labelNode.textContent = label + ': ';
-    const valueNode = document.createTextNode(value || 'Not provided');
-    summary.append(labelNode, valueNode, document.createElement('br'));
-  });
-}
-
-function finishOnboarding() {
-  const name = document.getElementById('onboard-name')?.value;
-  window.alert(name ? `Onboarding complete. Jobby is now active for ${name}` : 'Onboarding complete.');
-  if (onboardingOverlay) onboardingOverlay.style.display = 'none';
-}
-
-document.querySelectorAll('[data-open-onboarding]').forEach(button => {
-  button.addEventListener('click', openOnboarding);
-});
-document.querySelectorAll('[data-onboarding-step]').forEach(button => {
-  button.addEventListener('click', () => nextStep(Number(button.dataset.onboardingStep)));
-});
-document.querySelectorAll('[data-onboarding-finish]').forEach(button => {
-  button.addEventListener('click', finishOnboarding);
-});
-if (onboardingOverlay) {
-  onboardingOverlay.addEventListener('click', event => {
-    if (event.target === onboardingOverlay) onboardingOverlay.style.display = 'none';
-  });
-}
 
 ['dragenter', 'dragover'].forEach(eventName => {
   dropZone.addEventListener(eventName, event => {

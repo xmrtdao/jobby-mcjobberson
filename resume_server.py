@@ -63,9 +63,9 @@ _STATIC_CONTENT_TYPES = {
     ".pdf": "application/pdf",
     ".txt": "text/plain; charset=utf-8",
 }
-_STATIC_ASSETS = {"index.html", "styles.css", "app.js", "jobby.js"}
+_STATIC_ASSETS = {"index.html", "styles.css", "app.js", "jobby.js", "hero-scene.js"}
 # The assets that get a version stamp in the entry point's markup.
-_VERSIONED_ASSETS = ("app.js", "styles.css", "jobby.js")
+_VERSIONED_ASSETS = ("app.js", "styles.css", "jobby.js", "hero-scene.js")
 _SECURITY_HEADERS = {
     "Content-Security-Policy": (
         "default-src 'self'; script-src 'self'; "

@@ -14,3 +14,7 @@ resume_server.log
 .env
 *.key
 *.pem
+_patch_*.py
+_strip_*.py
+_probe_*.html
+_wide.html
