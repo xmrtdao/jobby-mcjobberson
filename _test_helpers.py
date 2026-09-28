@@ -171,15 +171,27 @@ first_only = _apply_deterministic_floor(
 )
 check("fallback to first job", first_only["current_company"] == "Acme")
 
-# experience_years must NOT be invented from dates
+# experience_years is measured from the employment dates, not taken from the
+# resume's own stated figure - a stated "15 years" can be the length of one
+# business the candidate owned rather than the length of their career. The
+# stated figure is kept beside it, and the span carries its provenance, so the
+# published number is never unattributable.
+# (This replaced an assertion that experience_years must never be derived from
+# dates, which encoded the opposite policy.)
 no_years = _apply_deterministic_floor(
     _normalise_dossier({"employment": [
         {"company": "A", "title": "T", "current": True, "start": "August 2015"},
     ]}),
     {},
 )
-check("experience_years never derived", no_years["experience_years"] is None,
+check("years measured from dates", no_years["experience_years"] == 11.0,
       no_years["experience_years"])
+check("span carries provenance",
+      no_years.get("experience_years_source") == "employment dates"
+      and no_years.get("experience_years_from_dates", {}).get("years") == 11,
+      (no_years.get("experience_years_source"), no_years.get("experience_years_from_dates")))
+check("stated figure kept separate", no_years.get("experience_years_stated") is None,
+      no_years.get("experience_years_stated"))
 
 # empty ingest must not break anything
 empty = _apply_deterministic_floor(_normalise_dossier({"name": "X"}), {})

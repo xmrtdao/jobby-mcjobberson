@@ -146,7 +146,10 @@ nav a:hover { color: var(--primary); }
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  padding: 3rem 1rem 3.5rem;
+  /* Tight. The field behind is full-bleed, so every rem of padding is a rem of
+   * empty slate. At 3rem/3.5rem the hero reached 842px, most of it nothing, and
+   * the drop zone fell below the fold. */
+  padding: 2rem 1rem 2.25rem;
   max-width: 1200px;
   margin: 0 auto;
 }
@@ -157,30 +160,43 @@ nav a:hover { color: var(--primary); }
   z-index: 0;
   pointer-events: none;
 }
-.hero-bg canvas { display: block; width: 100%; height: 100%; }
+.hero-bg canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* Depth of field. A layer meant to be behind has to look behind, and blur is
+   * the cheapest honest way to say so. It also dissolves the scene's own small
+   * text, so that text can never be misread for the page's text showing through
+   * it - which was the original reason for burying the layer under a
+   * near-opaque scrim.
+   *
+   * Scaled very slightly, because a filter samples from outside the element and
+   * would otherwise fade the layer's own edges. */
+  filter: blur(1.5px);
+  transform: scale(1.025);
+  transform-origin: 50% 42%;
+}
 
 /* Legibility.
  *
- * The scrim has to answer the layout, so it differs by width. Stacked, the copy
- * and the drop zone span the full width, so there is no clear area for the
- * scene and it is held back to a texture: a vertical wash that lets a little
- * through top and bottom where nothing is written. At desktop widths the split
- * puts the text on the left and gives the scene the right, which is where an
- * angled gradient does the job properly.
+ * Deliberately thin. It used to be 98-99% opaque across most of the hero, which
+ * is what buried the scene: the layer was there, animating, and completely
+ * invisible. Its only job now is to take the edge off the scene where the copy
+ * sits, because the copy carries its own backing and does not need the scrim to
+ * be readable.
  *
- * The opaque end has to be effectively solid in both. The scene draws form
- * labels across the whole canvas, and at anything less they read through the
- * hero points as ghost text behind real text, which is worse than either alone.
- */
+ * Angled rather than uniform because the two columns are not equal: the text
+ * wants a calmer patch on the left, and the drop zone is a solid card that
+ * needs none at all. */
 .hero-scrim {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(180deg,
-      rgba(248, 250, 252, 0.9) 0%,
-      rgba(248, 250, 252, 0.985) 14%,
-      rgba(248, 250, 252, 0.99) 86%,
-      rgba(248, 250, 252, 0.9) 100%);
+    linear-gradient(96deg,
+      rgba(248, 250, 252, 0.72) 0%,
+      rgba(248, 250, 252, 0.58) 40%,
+      rgba(248, 250, 252, 0.34) 72%,
+      rgba(248, 250, 252, 0.22) 100%);
 }
 
 .hero-inner {
@@ -192,7 +208,26 @@ nav a:hover { color: var(--primary); }
   text-align: center;
 }
 
-.hero-copy { max-width: 34rem; margin: 0 auto; }
+/* The copy carries its own backing. This is what lets the scrim stay thin: the
+ * legibility of the words comes from this panel, not from burying the animation
+ * underneath them.
+ *
+ * Kept well short of opaque, because an opaque panel is just a hole in the
+ * layer. At 0.82 the hero read as a white slab with the animation peeking round
+ * its edges. At 0.62 over a scene that is itself light where the copy sits, the
+ * heading still has full contrast, and the frosted blur turns what is behind it
+ * into a wash instead of competing shapes. */
+.hero-copy {
+  max-width: 34rem;
+  margin: 0 auto;
+  padding: 1.4rem 1.5rem 1.55rem;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow: 0 18px 42px -26px rgba(15, 23, 42, 0.45);
+  -webkit-backdrop-filter: blur(18px) saturate(1.15);
+  backdrop-filter: blur(18px) saturate(1.15);
+}
 
 .hero h1 {
   font-size: 2rem;
@@ -313,7 +348,7 @@ nav a:hover { color: var(--primary); }
 }
 
 @media (min-width: 900px) {
-  .hero { padding: 5rem 2rem 5.5rem; }
+  .hero { padding: 3rem 2rem 3.5rem; }
   /* Copy and drop zone share the row. The copy takes a little under half so a
    * line of the h1 never runs the full measure of the page. */
   .hero-inner {
@@ -322,21 +357,33 @@ nav a:hover { color: var(--primary); }
     text-align: left;
     gap: 3.5rem;
   }
-  .hero-copy { flex: 0 0 46%; margin: 0; }
+  /* Grows a little past its basis to absorb the padding it now carries, so the
+   * two columns stay visually even rather than the copy looking narrow. */
+  .hero-copy { flex: 0 0 46%; margin: 0; padding: 1.75rem 1.75rem 1.9rem; }
   .hero h1 { font-size: 3.25rem; }
   .hero-points { margin-left: 0; }
-  .resume-drop-zone { flex: 1 1 54%; max-width: none; margin: 0; text-align: left; }
+  .resume-drop-zone {
+    flex: 1 1 54%;
+    max-width: none;
+    margin: 0;
+    text-align: left;
+    /* Matched to the copy panel so the two read as a pair. */
+    background: rgba(255, 255, 255, 0.72);
+    box-shadow: 0 18px 42px -26px rgba(15, 23, 42, 0.45);
+    -webkit-backdrop-filter: blur(18px) saturate(1.15);
+    backdrop-filter: blur(18px) saturate(1.15);
+  }
   .hero-scene-bar { right: 2rem; bottom: 1.5rem; }
-  /* Two columns, so the scene is given the right-hand side to live in and the
-   * angled gradient can do its job: solid under the copy, thin over the scene. */
+  /* Thinner still than the stacked default. With two panels each carrying
+   * their own backing, the right-hand side is bare page and that is where the
+   * scene should be doing the most visible work. */
   .hero-scrim {
     background:
       linear-gradient(96deg,
-        rgba(248, 250, 252, 0.995) 0%,
-        rgba(248, 250, 252, 0.99) 34%,
-        rgba(248, 250, 252, 0.93) 54%,
-        rgba(248, 250, 252, 0.72) 74%,
-        rgba(248, 250, 252, 0.5) 100%);
+        rgba(248, 250, 252, 0.66) 0%,
+        rgba(248, 250, 252, 0.42) 34%,
+        rgba(248, 250, 252, 0.24) 58%,
+        rgba(248, 250, 252, 0.12) 100%);
   }
 }
 

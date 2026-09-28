@@ -292,13 +292,21 @@ _MODEL_USER_AGENT = (
 )
 
 
-def _llm_json(system: str, user: str, *, temperature: float = 0.2) -> dict[str, Any]:
+def _llm_json(
+    system: str, user: str, *, temperature: float = 0.2, allow_text: bool = False
+) -> dict[str, Any] | str:
     """One model call, expected to answer with a single JSON object.
 
     Every value here is an interpretation of a document the deterministic
     extractor has already read, so the prompt forbids inventing anything. A
     model that answers with prose instead of JSON gets one repair attempt,
     because it does that intermittently and the alternative is losing the pass.
+
+    allow_text is for the caller that can use a prose answer. The interpret pass
+    sometimes replies with capitalised headings and bullets rather than JSON;
+    that is still an answer, and _parse_labelled_sections can read it, so it is
+    handed back instead of raising. Without this the pass is simply lost for
+    being formatted differently from what was asked.
     """
     base, key, model = _model_settings()
     if not key:
@@ -376,6 +384,8 @@ def _llm_json(system: str, user: str, *, temperature: float = 0.2) -> dict[str, 
         parsed = _extract_json_object(content)
         if isinstance(parsed, dict):
             return parsed
+        if allow_text and isinstance(content, str) and content.strip():
+            return content
         last_error = "no JSON object in the reply"
 
     raise ModelUnavailable(last_error or "the model did not answer with JSON")
@@ -451,6 +461,441 @@ _INTERPRET_SYSTEM = (
     "the document. Anything you cannot confirm goes in not_stated."
 )
 
+# -- normalisation ------------------------------------------------------------
+#
+# The passes are asked for a fixed schema and do not reliably keep to it. These
+# map the shapes the model actually returns onto the one the rest of the code
+# reads, so that an awkward reply is a normalisation problem here rather than a
+# broken document three stages downstream.
+
+_CONFIDENCE_LEVELS = {"high", "medium", "low"}
+
+# Keys the model invents, mapped onto the ones the code reads. Observed: the
+# person nested under "person", a role called "position", and the resume's own
+# wording in "raw_start_date" sitting beside a transcribed "start_date".
+_KEY_ALIASES = {
+    "full_name": "name",
+    "current_employer": "current_company",
+    "title": "current_title",
+    "years_of_experience": "experience_years",
+    "professional_summary": "summary",
+    "email_address": "email",
+    "domain_tags": "job_fields",
+    "extraction_confidence": "confidence",
+    "quantified_achievements": "achievements",
+    "experience": "employment",
+    "roles": "target_roles",
+}
+
+_LINK_ALIASES = {
+    "personal_site": "portfolio",
+    "personal_website": "portfolio",
+    "site": "portfolio",
+    "blog": "website",
+    "personal": "website",
+    "github_url": "github",
+    "linkedin_url": "linkedin",
+}
+
+# Bookkeeping rather than content. A dossier is not useful because it recorded
+# that it is not confident.
+_NOT_CONTENT = {
+    "confidence", "not_stated", "verification_flags", "sourceFilename",
+    "onboarding", "roles_in_resume", "experience_years_source",
+    "experience_years_stated", "experience_years_from_dates",
+}
+
+# Fields that, on their own, mean the resume was actually read.
+_CONTENT_ALONE = {
+    "summary", "skills", "employment", "education", "links", "certifications",
+    "achievements", "job_fields", "domain_expertise", "target_roles",
+    "current_title", "current_company",
+}
+
+
+def _text(value: Any) -> str | None:
+    """A trimmed string, or None.
+
+    Bare numbers deliberately do not become text. Coercing them is how 42 ends
+    up in a list of skills; the one place a number is wanted as a string (a
+    graduation year) converts it itself.
+    """
+    if isinstance(value, str):
+        return value.strip() or None
+    if isinstance(value, dict):
+        for key in ("description", "text", "name", "title", "label", "value"):
+            inner = value.get(key)
+            if isinstance(inner, str) and inner.strip():
+                return inner.strip()
+    return None
+
+
+def _text_list(value: Any) -> list[str]:
+    """Strings out of whatever shape the model used, deduped, order kept."""
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        value = [value]
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in value:
+        text = _text(item)
+        if not text:
+            continue
+        key = text.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(text)
+    return out
+
+
+def _number(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        match = re.search(r"\d+(?:\.\d+)?", value)
+        if match:
+            return float(match.group(0))
+    return None
+
+
+def _flag(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        return value.strip().casefold() in {"1", "true", "yes", "y", "current", "ongoing"}
+    return False
+
+
+def _location(value: Any) -> str | None:
+    """A dict location flattened to the order a person would say it in."""
+    if isinstance(value, dict):
+        parts = [
+            _text(value.get(key))
+            for key in ("city", "state", "region", "country")
+        ]
+        joined = ", ".join(p for p in parts if p)
+        return joined or None
+    return _text(value)
+
+
+def _merge_links(links: dict[str, Any], value: Any) -> None:
+    if isinstance(value, str):
+        value = {"website": value}
+    if not isinstance(value, dict):
+        return
+    for key, val in value.items():
+        canonical = _LINK_ALIASES.get(str(key).strip().casefold(), str(key).strip().casefold())
+        if canonical == "other":
+            # "other" is the plural bucket, so a bare string there is a list of
+            # one. The named links stay single strings, which is the shape the
+            # renderer and the deterministic floor both write.
+            existing = _text_list(links.get("other"))
+            for text in _text_list(val):
+                if text not in existing:
+                    existing.append(text)
+            links["other"] = existing
+        else:
+            text = _text(val)
+            if text and not links.get(canonical):
+                links[canonical] = text
+
+
+def _employment_items(value: Any) -> list[dict[str, Any]]:
+    if isinstance(value, dict):
+        value = [value]
+    if not isinstance(value, list):
+        return []
+    out: list[dict[str, Any]] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        # raw_* is the resume's own wording and outranks the transcribed date
+        # beside it: transposing March 2021 into 2017-03 is the exact defect the
+        # timeline reconciliation exists to undo, so the verbatim value is taken
+        # first here rather than being overwritten downstream.
+        #
+        # Taking it here is also why the provenance is recorded here. The model
+        # is the one returning both, so the date is the document's text from the
+        # moment it is chosen - and by the time the timeline reconciliation runs
+        # there is nothing left for it to correct, which would silently drop the
+        # note on the most trustworthy dates in the dossier.
+        start_key = next(
+            (k for k in ("raw_start_date", "start_date", "start")
+             if isinstance(item.get(k), str) and item[k].strip()),
+            None,
+        )
+        end_key = next(
+            (k for k in ("raw_end_date", "end_date", "end")
+             if isinstance(item.get(k), str) and item[k].strip()),
+            None,
+        )
+        current = item.get("is_current", item.get("current"))
+        job = {
+            "company": _text(
+                item.get("company") or item.get("employer")
+                or item.get("organisation") or item.get("organization")
+            ),
+            "title": _text(
+                item.get("title") or item.get("position")
+                or item.get("role") or item.get("job_title")
+            ),
+            "location": _location(item.get("location")),
+            "start": _text(item.get(start_key) if start_key else None),
+            "end": _text(item.get(end_key) if end_key else None),
+            "current": _flag(current),
+            "highlights": _text_list(
+                item.get("highlights") or item.get("bullets") or item.get("achievements")
+            ),
+        }
+        if start_key and start_key.startswith("raw_"):
+            job["dates_from"] = "resume text"
+        elif isinstance(item.get("dates_from"), str) and item["dates_from"].strip():
+            # Carried through. The dossier is normalised more than once - each
+            # pass, then the merged result - and on the later passes the raw_*
+            # key is long gone, so without this the provenance recorded on the
+            # first pass would be silently dropped on the way to the dossier.
+            job["dates_from"] = item["dates_from"].strip()
+        if job["company"] or job["title"] or job["start"]:
+            out.append(job)
+    return out
+
+
+def _education_items(value: Any) -> list[dict[str, Any]]:
+    if isinstance(value, dict):
+        value = [value]
+    if not isinstance(value, list):
+        return []
+    out: list[dict[str, Any]] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        year = item.get("graduation_year", item.get("year", item.get("end_year")))
+        if isinstance(year, (int, float)) and not isinstance(year, bool):
+            year = str(int(year))
+        entry = {
+            "institution": _text(
+                item.get("institution") or item.get("school") or item.get("university")
+            ),
+            "degree": _text(item.get("degree")),
+            "field": _text(
+                item.get("field") or item.get("field_of_study") or item.get("major")
+            ),
+            "year": _text(year),
+        }
+        if any(entry.values()):
+            out.append(entry)
+    return out
+
+
+def _normalise_dossier(raw: Any) -> dict[str, Any]:
+    """Coerce one model reply into the shape the dossier and renderer expect.
+
+    Every key is always present, so a consumer can read a field without first
+    checking whether the model mentioned it. Nothing is invented here: absent
+    fields become None or [], never a plausible-looking default.
+    """
+    if not isinstance(raw, dict):
+        raw = {}
+    out: dict[str, Any] = {
+        "name": None,
+        "current_title": None,
+        "current_company": None,
+        "email": None,
+        "phone": None,
+        "location": None,
+        # Named links are present-but-None rather than absent, so a consumer can
+        # read one without checking whether the model mentioned it.
+        "links": {"linkedin": None, "github": None, "portfolio": None,
+                  "website": None, "other": []},
+        "summary": None,
+        "skills": [],
+        "seniority": None,
+        "employment": [],
+        "education": [],
+        "certifications": [],
+        "achievements": [],
+        "job_fields": [],
+        "domain_expertise": [],
+        "target_roles": [],
+        "experience_years": None,
+        "confidence": "low",
+        "not_stated": [],
+        "verification_flags": [],
+    }
+
+    person = raw.get("person") if isinstance(raw.get("person"), dict) else {}
+    # The nested person first, then the top level over it, so an explicit
+    # top-level value is the one that wins.
+    for source in (person, raw):
+        for key, value in source.items():
+            target = _KEY_ALIASES.get(str(key).strip().casefold(), str(key).strip().casefold())
+            if target == "links":
+                _merge_links(out["links"], value)
+            elif target == "location":
+                out["location"] = _location(value) or out["location"]
+            elif target in ("name", "current_title", "current_company", "summary",
+                            "seniority"):
+                out[target] = _text(value) or out[target]
+            elif target in ("email", "phone"):
+                out[target] = _text(value) or out[target]
+            elif target == "experience_years":
+                number = _number(value)
+                if number is not None:
+                    out["experience_years"] = number
+            elif target == "confidence":
+                level = _text(value)
+                level = level.casefold() if level else ""
+                out["confidence"] = level if level in _CONFIDENCE_LEVELS else "low"
+            elif target == "employment":
+                out["employment"].extend(_employment_items(value))
+            elif target == "education":
+                out["education"].extend(_education_items(value))
+            elif target in ("skills", "certifications", "achievements", "job_fields",
+                            "domain_expertise", "target_roles", "not_stated",
+                            "verification_flags"):
+                out[target].extend(_text_list(value))
+
+    # Sections the extractor said were missing are gaps, same as a field it
+    # could not confirm, and the flags it raised are shown to the candidate.
+    meta = raw.get("extraction_metadata")
+    if isinstance(meta, dict):
+        out["not_stated"].extend(_text_list(meta.get("sections_missing")))
+        out["verification_flags"].extend(_text_list(meta.get("flags")))
+
+    for key in ("skills", "certifications", "achievements", "job_fields",
+                "domain_expertise", "target_roles", "not_stated",
+                "verification_flags"):
+        out[key] = _text_list(out[key])
+
+    # Employment and education can arrive from more than one key, so the same
+    # job must not be listed twice.
+    seen: set[tuple[str, str, str]] = set()
+    deduped: list[dict[str, Any]] = []
+    for job in out["employment"]:
+        marker = ((job["company"] or "").casefold(), (job["title"] or "").casefold(),
+                  job["start"] or "")
+        if marker in seen:
+            continue
+        seen.add(marker)
+        deduped.append(job)
+    out["employment"] = deduped
+    return out
+
+
+def _has_content(value: Any) -> bool:
+    """Does this value carry anything a person would call information?
+
+    Recurses, because the seeded links dict is a non-empty dict of Nones and
+    must not pass for content. Compared against None and False by identity
+    rather than truthiness, so a legitimate 0 is not mistaken for empty.
+    """
+    if isinstance(value, dict):
+        return any(_has_content(inner) for inner in value.values())
+    if isinstance(value, list):
+        return any(_has_content(inner) for inner in value)
+    if isinstance(value, str):
+        return bool(value.strip())
+    return value is not None and value is not False
+
+
+def _dossier_is_useful(dossier: Any) -> bool:
+    """Is there enough here to show a candidate as having been read?
+
+    Two populated fields, or one that is substantive on its own. A lone name is
+    not enough: it is the one field a model will produce from a document that
+    says nothing else, and a dossier containing only a name is indistinguishable
+    from a failed read.
+    """
+    if not isinstance(dossier, dict):
+        return False
+    populated = [
+        key for key, value in dossier.items()
+        if key not in _NOT_CONTENT and _has_content(value)
+    ]
+    if len(populated) >= 2:
+        return True
+    return bool(populated) and populated[0] in _CONTENT_ALONE
+
+
+_SECTION_LABEL = re.compile(r"^([A-Z][A-Z &/]{2,40}):?\s*$")
+_SECTION_ITEM = re.compile(r"^(?:[-*\u2022\u2013]\s*|\d+[.)]\s*)?")
+
+
+# Section headings the interpret pass uses, mapped onto the schema keys. Matched
+# case- and space-insensitively, because the model chooses its own
+# capitalisation and its own singular or plural.
+_SECTION_TARGETS = {
+    "EXPERTISE": "domain_expertise",
+    "EXPERTISE AREAS": "domain_expertise",
+    "AREAS OF EXPERTISE": "domain_expertise",
+    "SKILLS": "skills",
+    "JOB FIELDS": "job_fields",
+    "FIELDS": "job_fields",
+    "ROLES": "target_roles",
+    "TARGET ROLES": "target_roles",
+    "ROLES THEY COULD DO": "target_roles",
+    "NOT STATED": "not_stated",
+}
+
+
+def _sections_to_dossier(text: str) -> dict[str, Any]:
+    """A prose interpret answer, read into the schema it should have returned."""
+    sections = _parse_labelled_sections(text)
+    out: dict[str, Any] = {}
+    for label, items in sections.items():
+        target = _SECTION_TARGETS.get(" ".join(label.upper().split()))
+        if target:
+            out.setdefault(target, [])
+            out[target].extend(items)
+    return out
+
+
+def _parse_labelled_sections(text: str) -> dict[str, list[str]]:
+    """Pull labelled lists out of a plain-text model reply.
+
+    The interpret pass is asked for JSON, and usually complies. When it does
+    not, it tends to answer with capitalised headings and bullets instead - and
+    the retry loop raises once the JSON never arrives, losing a pass that in fact
+    answered. This is the fallback for that case, and the reason the
+    interpretation is not simply dropped.
+
+    Lines that read as commentary rather than as list items are discarded, so a
+    sentence about the candidate does not end up in their field list.
+    """
+    if not isinstance(text, str) or not text.strip():
+        return {}
+    if "{" in text and "}" in text:
+        # A JSON reply is handled by _extract_json_object; there is nothing to
+        # salvage here and parsing it as prose would invent sections.
+        return {}
+    sections: dict[str, list[str]] = {}
+    label: str | None = None
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        match = _SECTION_LABEL.match(line)
+        if match:
+            label = match.group(1).strip()
+            sections.setdefault(label, [])
+            continue
+        if label is None:
+            continue
+        item = _SECTION_ITEM.sub("", line).strip().strip(",;")
+        # A long sentence is commentary, not a list entry.
+        if not item or len(item) > 70 or len(item.split()) > 8:
+            continue
+        if item not in sections[label]:
+            sections[label].append(item)
+    return {k: v for k, v in sections.items() if v}
+
+
 _IDENTITY_SCHEMA = (
     '{"name": string or null, "current_title": string or null, '
     '"current_company": string or null, "email": string or null, '
@@ -505,7 +950,13 @@ def _classify_link(url: str) -> str | None:
         return "github"
     if any(token in lowered for token in ("portfolio", "behance", "dribbble")):
         return "portfolio"
-    if any(token in lowered for token in ("http://", "https://")) and "." in lowered.split("//")[-1].split("/")[0]:
+    # Anything left with a hostname and a real-looking TLD is the candidate's
+    # own site. The scheme is not required: the parser normalises the URLs it
+    # finds, so "https://jellis.dev" arrives here as "jellis.dev", and a test
+    # that insisted on the scheme sent every bare domain to the other bucket
+    # where it was never used for anything.
+    host = lowered.split("//")[-1].split("/")[0].split("?")[0].split("#")[0]
+    if "." in host and len(host.rsplit(".", 1)[-1]) >= 2 and not host.endswith("."):
         return "website"
     return None
 
@@ -594,6 +1045,17 @@ def _apply_deterministic_floor(
         if dossier.get("current_company") and dossier.get("current_title"):
             break
 
+    # A first job carries no current flag, and a resume whose only role is that
+    # first job is describing a current position by not saying otherwise. Taking
+    # the earliest entry here would be wrong, so this is the first, and only
+    # when nothing was flagged current.
+    if jobs and not (dossier.get("current_company") and dossier.get("current_title")):
+        first = jobs[0]
+        if not dossier.get("current_company") and first.get("company"):
+            dossier["current_company"] = first["company"]
+        if not dossier.get("current_title") and first.get("title"):
+            dossier["current_title"] = first["title"]
+
     # Role titles the document actually names. The model rarely volunteers role
     # suggestions when asked in a JSON schema, and answering that question from
     # the document is grounded, so this is always available where the AI's
@@ -613,6 +1075,12 @@ def _apply_deterministic_floor(
                 break
         if roles:
             dossier["roles_in_resume"] = roles
+    # Always present, including when there is no employment to read. A consumer
+    # that has to distinguish "no roles found" from "never looked" ends up
+    # guessing at a missing key.
+    dossier.setdefault("roles_in_resume", [])
+    if not isinstance(dossier.get("target_roles"), list):
+        dossier["target_roles"] = []
 
     _pin_experience_years(dossier, ingested)
     _reconcile_timeline_with_source(dossier, ingested)
@@ -694,11 +1162,29 @@ def _reconcile_timeline_with_source(
         # whenever the model happened to supply one. These strings were read
         # verbatim out of the header, so they are the document's own text, and
         # dates_from records that so the two are never confused.
+        #
+        # Only recorded when a value actually moved. A model that already
+        # matched the document has not been corrected, and marking it as though
+        # it had would put a provenance note on a claim that was never in
+        # question.
+        corrected = False
         for key in ("start", "end"):
             value = hint.get(key)
-            if isinstance(value, str) and value.strip():
+            if isinstance(value, str) and value.strip() and job.get(key) != value.strip():
                 job[key] = value.strip()
-                job["dates_from"] = "resume"
+                corrected = True
+        if corrected:
+            job["dates_from"] = "resume text"
+
+        # Bullets the parser read under the same header, when the model produced
+        # none of its own. The model keeps its own where it wrote any: its
+        # phrasing is usually better, and the document's version is a
+        # transcription rather than a rewrite.
+        if not job.get("highlights"):
+            hint_highlights = [h for h in (hint.get("highlights") or [])
+                               if isinstance(h, str) and h.strip()]
+            if hint_highlights:
+                job["highlights"] = hint_highlights
         if hint.get("company") and not job.get("company"):
             job["company"] = hint["company"]
 
@@ -842,10 +1328,12 @@ def _build_dossier(text: str, filename: str, ingested: dict[str, Any]) -> dict[s
                 "=== END RESUME ===\n"
             )
         try:
-            result = _llm_json(system, prompt)
+            result = _llm_json(system, prompt, allow_text=(run == "interpret"))
         except ModelUnavailable as error:
             failures.append(f"{label}: {error}")
             result = {}
+        if isinstance(result, str):
+            result = _sections_to_dossier(result)
         if run == "identity":
             identity = result
         elif run == "history":
@@ -853,10 +1341,22 @@ def _build_dossier(text: str, filename: str, ingested: dict[str, Any]) -> dict[s
         else:
             interpret = result
 
+    # Each pass is normalised before it is merged. Without this the model's raw
+    # object goes straight into the dossier and from there into the renderer and
+    # the application filler, so "9 years" arrives where a number belongs and a
+    # dict arrives inside the skills list. It is normalisation, not invention:
+    # absent fields become None, never a default.
+    identity = _normalise_dossier(identity)
+    history = _normalise_dossier(history)
+    interpret = _normalise_dossier(interpret)
+
     dossier = _merge_dossier(identity, history)
     for key, value in interpret.items():
         if key not in dossier or dossier.get(key) in (None, "", [], {}):
             dossier[key] = value
+    # Normalise the merged result too, since merging two normalised dicts can
+    # still leave list-valued fields concatenated rather than deduped.
+    dossier = _normalise_dossier(dossier)
 
     if not isinstance(dossier.get("employment"), list):
         dossier["employment"] = []
@@ -939,6 +1439,22 @@ def _run_dossier_job(
 ) -> None:
     try:
         profile = _build_dossier(text, filename, ingested)
+        if not _dossier_is_useful(profile):
+            # Every model pass came back empty and the deterministic floor found
+            # nothing either. Reporting "done" is the one outcome that must not
+            # happen here: the panel would render a dossier of blank fields and
+            # the candidate would read it as a successful read of their resume,
+            # which is the exact opposite of what happened. This is the failure
+            # this whole pipeline is supposed to be honest about.
+            _dossier_job_put(request_id, {
+                "status": "error",
+                "error": (
+                    "Nothing could be read from that file. If it is a scan or "
+                    "a photo of a page, the text cannot be extracted from it - "
+                    "try the original document, or a .docx or .txt copy."
+                ),
+            })
+            return
         _dossier_job_put(request_id, {"status": "done", "profile": profile})
         onboarding = _onboard_with_jobby(profile, filename, cookie)
         if isinstance(onboarding, dict) and onboarding:

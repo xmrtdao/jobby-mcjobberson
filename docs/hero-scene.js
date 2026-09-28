@@ -36,11 +36,21 @@
   var FRAME_MS = 1000 / 30;
 
   var PALETTE = {
-    page: '#f8fafc',
+    // The scene sits behind the hero now, so its ground has to differ from the
+    // page. It used to be page: '#f8fafc', which is exactly --bg, and the
+    // window it sat in was white - so the whole layer was the colour of the
+    // page underneath it, and no scrim thin enough to be worth having would
+    // ever have made it visible. A background layer needs a ground of its own.
+    groundTop: '#dde6f3',
+    groundBottom: '#c4d3e8',
+    groundDot: 'rgba(71, 85, 105, 0.18)',
+    page: '#f1f5f9',
     window: '#ffffff',
-    chrome: '#eef2f7',
-    border: '#cbd5e1',
-    borderSoft: '#e2e8f0',
+    chrome: '#e7edf6',
+    // Stronger than a hairline. The window is the only hard edge in the layer
+    // and it is what tells you there is a screen back there at all.
+    border: '#93a7c1',
+    borderSoft: '#dbe3ee',
     ink: '#0f172a',
     muted: '#64748b',
     faint: '#94a3b8',
@@ -539,22 +549,69 @@
       draw(0);
     }
 
-    function draw(ms) {
+  // The scene's own ground, painted across the whole canvas in screen space.
+  //
+  // Two mistakes are being corrected here. The canvas used to clear to nothing,
+  // so the layer had no tone of its own and whatever it did not paint was simply
+  // the page behind it. Adding a ground was not enough on its own, because the
+  // window fills 97% of the scene box - the ground showed as a hairline round
+  // the edge and the layer still read as a white rectangle.
+  //
+  // So the ground is painted outside the scene's coordinate space and the scene
+  // is fitted inside it. The field is then identical at any aspect ratio, and
+  // what would be letterbox bars is just more field.
+  function drawGround(ctx, w, h) {
+    var grad = ctx.createLinearGradient(0, 0, w * 0.35, h);
+    grad.addColorStop(0, PALETTE.groundTop);
+    grad.addColorStop(1, PALETTE.groundBottom);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+
+    // A dot grid in screen space, so its spacing does not shift with the scale.
+    // This is the part that still reads once the scrim is doing its job: it is
+    // the one thing here with a visible pattern rather than a small difference
+    // in lightness, and a pattern survives a wash that a tone difference does not.
+    ctx.fillStyle = PALETTE.groundDot;
+    var step = 30;
+    for (var gx = step / 2; gx < w; gx += step) {
+      for (var gy = step / 2; gy < h; gy += step) {
+        ctx.beginPath();
+        ctx.arc(gx, gy, 1.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // Vignette, so the field has a centre of gravity and the corners stop
+    // competing with the copy for attention.
+    var vg = ctx.createRadialGradient(
+      w * 0.5, h * 0.45, Math.min(w, h) * 0.18,
+      w * 0.5, h * 0.45, Math.max(w, h) * 0.62);
+    vg.addColorStop(0, 'rgba(255, 255, 255, 0.22)');
+    vg.addColorStop(1, 'rgba(71, 85, 105, 0.22)');
+    ctx.fillStyle = vg;
+    ctx.fillRect(0, 0, w, h);
+  }
+
+  function draw(ms) {
       var w = canvas.width / (Math.min(window.devicePixelRatio || 1, 2));
       var h = canvas.height / (Math.min(window.devicePixelRatio || 1, 2));
       ctx.clearRect(0, 0, w, h);
 
       var state = actAt(time);
 
-      // The scene is laid out in a fixed 1240x620 space, but the hero is close
-      // to square on a narrow screen, so drawing into it at 1:1 made the window
-      // chrome run off the sides and the form fill the box. Scaled to cover and
-      // centred, the excess is cropped instead - which suits a background, where
-      // looking at part of a larger screen is the point. Cover rather than
-      // contain, so there are never letterbox bars showing the page behind.
-      var scale = Math.max(w / SCENE_W, h / SCENE_H);
+      // The scene is laid out in a fixed 1240x620 space and the hero is close to
+      // square, so it has to be fitted. Contained rather than covered: covering
+      // scaled it up 1.2x and threw away half its width, which magnified the
+      // act detail into horizontal bands - decoration, not a screen working.
+      // Contained, the window stays whole and its contents stay at a size a
+      // person can recognise. The gap left over is not a letterbox bar, because
+      // the ground has already been painted across the whole canvas.
+      var scale = Math.min(w / SCENE_W, h / SCENE_H);
       var offsetX = (w - SCENE_W * scale) / 2;
       var offsetY = (h - SCENE_H * scale) / 2;
+      // The field goes down first, in screen space, across the entire canvas.
+      drawGround(ctx, w, h);
+
       ctx.save();
       ctx.translate(offsetX, offsetY);
       ctx.scale(scale, scale);
@@ -565,8 +622,14 @@
       var winW = SCENE_W - pad * 2;
       var winH = SCENE_H - pad * 2;
 
-      // The window itself
+      // The window itself, with a drop shadow as well as a border, so it reads
+      // as a panel lifted off the ground rather than a rectangle drawn on it.
+      ctx.save();
+      ctx.shadowColor = 'rgba(15, 23, 42, 0.3)';
+      ctx.shadowBlur = 28;
+      ctx.shadowOffsetY = 12;
       panel(ctx, winX, winY, winW, winH, PALETTE.window, PALETTE.border);
+      ctx.restore();
       ctx.save();
       roundRect(ctx, winX, winY, winW, 40, 10);
       ctx.clip();
