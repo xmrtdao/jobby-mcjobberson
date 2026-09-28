@@ -45,6 +45,56 @@ _MONTHS = (
 )
 
 
+# --- output language ---------------------------------------------------------
+#
+# The downloadable CV is the artefact a candidate actually sends, so it follows
+# the site language. Only the headings and the composed experience line live
+# here; everything else in the document is a value the model wrote, which is
+# already in the requested language because the dossier build was told to write
+# it there.
+#
+# Deliberately not translated: employer names, job titles, certifications, skills
+# and acronyms. Those are proper nouns the build was instructed to keep verbatim,
+# and translating them would be both wrong and inconsistent with the dossier.
+
+_SECTION_NAMES = {
+    "en": {
+        "experience": "PROFESSIONAL EXPERIENCE",
+        "education": "EDUCATION",
+        "skills": "SKILLS",
+        "certifications": "CERTIFICATIONS",
+        "years": "{years} years of professional experience",
+        "present": "Present",
+        "resume_word": "Resume",
+    },
+    "es": {
+        "experience": "EXPERIENCIA PROFESIONAL",
+        "education": "FORMACIÓN",
+        "skills": "HABILIDADES",
+        "certifications": "CERTIFICACIONES",
+        "years": "{years} años de experiencia profesional",
+        "present": "Actualidad",
+        "resume_word": "Currículum",
+    },
+}
+
+# Mirrors resume_server._normalise_lang: anything unrecognised is English, so a
+# stray value cannot put a language on the document the site has no copy for.
+_LANGS = tuple(_SECTION_NAMES)
+
+
+def _lang(value: Any) -> str:
+    if isinstance(value, str) and value.strip().casefold()[:2] in _LANGS:
+        return value.strip().casefold()[:2]
+    return "en"
+
+
+def _t(key: str, lang: Any = "en", **fields: Any) -> str:
+    table = _SECTION_NAMES[_lang(lang)]
+    text = table.get(key, _SECTION_NAMES["en"].get(key, key))
+    return text.format(**fields) if fields else text
+
+
 def _text(value: Any) -> str:
     if value is None:
         return ""
@@ -89,7 +139,7 @@ def format_date_range(job: dict[str, Any]) -> str:
     return f"{start} - {end}"
 
 
-def experience_summary(dossier: dict[str, Any]) -> str | None:
+def experience_summary(dossier: dict[str, Any], lang: str = "en") -> str | None:
     """One line about total experience, with its provenance kept intact.
 
     The dossier publishes a figure measured from the employment dates and keeps
@@ -104,7 +154,7 @@ def experience_summary(dossier: dict[str, Any]) -> str | None:
     if rounded <= 0:
         return None
     span = dossier.get("experience_years_from_dates")
-    line = f"{rounded} years of professional experience"
+    line = _t("years", lang, years=rounded)
     if isinstance(span, dict) and span.get("from") and span.get("to"):
         line += f" ({span['from']} to {span['to']}, measured from employment dates)"
     return line
@@ -147,7 +197,7 @@ def _role_bullets(job: dict[str, Any]) -> list[str]:
 # ── DOCX ────────────────────────────────────────────────────────────────────
 
 
-def render_docx(dossier: dict[str, Any]) -> bytes:
+def render_docx(dossier: dict[str, Any], lang: str = "en") -> bytes:
     """A DOCX resume built from the dossier."""
     if not DOCX_AVAILABLE:
         raise RuntimeError("python-docx is not installed")
@@ -184,7 +234,7 @@ def render_docx(dossier: dict[str, Any]) -> bytes:
         run.font.color.rgb = RGBColor(0x33, 0x33, 0x33)
         paragraph.paragraph_format.space_after = Pt(0)
 
-    summary_line = experience_summary(dossier)
+    summary_line = experience_summary(dossier, lang)
     if summary_line:
         paragraph = document.add_paragraph()
         run = paragraph.add_run(summary_line)
@@ -200,7 +250,7 @@ def render_docx(dossier: dict[str, Any]) -> bytes:
     if roles:
         document.add_paragraph()
         heading = document.add_paragraph()
-        run = heading.add_run("PROFESSIONAL EXPERIENCE")
+        run = heading.add_run(_t("experience", lang))
         run.bold = True
         run.font.size = Pt(11)
         heading.paragraph_format.space_before = Pt(8)
@@ -243,7 +293,7 @@ def render_docx(dossier: dict[str, Any]) -> bytes:
     if education:
         document.add_paragraph()
         heading = document.add_paragraph()
-        run = heading.add_run("EDUCATION")
+        run = heading.add_run(_t("education", lang))
         run.bold = True
         run.font.size = Pt(11)
         heading.paragraph_format.space_before = Pt(8)
@@ -264,7 +314,7 @@ def render_docx(dossier: dict[str, Any]) -> bytes:
     if skills:
         document.add_paragraph()
         heading = document.add_paragraph()
-        run = heading.add_run("SKILLS")
+        run = heading.add_run(_t("skills", lang))
         run.bold = True
         run.font.size = Pt(11)
         heading.paragraph_format.space_before = Pt(8)
@@ -276,7 +326,7 @@ def render_docx(dossier: dict[str, Any]) -> bytes:
     if certifications:
         document.add_paragraph()
         heading = document.add_paragraph()
-        run = heading.add_run("CERTIFICATIONS")
+        run = heading.add_run(_t("certifications", lang))
         run.bold = True
         run.font.size = Pt(11)
         heading.paragraph_format.space_before = Pt(8)
@@ -295,7 +345,7 @@ def render_docx(dossier: dict[str, Any]) -> bytes:
 # ── HTML ────────────────────────────────────────────────────────────────────
 
 
-def render_html(dossier: dict[str, Any]) -> str:
+def render_html(dossier: dict[str, Any], lang: str = "en") -> str:
     """A print-ready HTML resume, for the candidate who wants a PDF.
 
     The page carries a print stylesheet so the browser's own Save as PDF gives a
@@ -305,8 +355,8 @@ def render_html(dossier: dict[str, Any]) -> str:
     esc = html_mod.escape
     parts: list[str] = []
     parts.append(
-        "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\">"
-        "<title>" + esc(_text(dossier.get("name")) or "Resume") + "</title>"
+        "<!DOCTYPE html><html lang=\"" + _lang(lang) + "\"><head><meta charset=\"utf-8\">"
+        "<title>" + esc(_text(dossier.get("name")) or _t("resume_word", lang)) + "</title>"
         "<style>"
         "body{font-family:Calibri,Arial,sans-serif;font-size:11pt;line-height:1.45;"
         "color:#1a1a1a;max-width:7in;margin:0.6in auto;padding:0 0.2in}"
@@ -341,7 +391,7 @@ def render_html(dossier: dict[str, Any]) -> str:
             + "".join("<span>" + esc(part) + "</span>" for part in contact)
             + "</p>"
         )
-    summary_line = experience_summary(dossier)
+    summary_line = experience_summary(dossier, lang)
     if summary_line:
         parts.append('<p class="years">' + esc(summary_line) + "</p>")
     if _text(dossier.get("summary")):
@@ -349,7 +399,7 @@ def render_html(dossier: dict[str, Any]) -> str:
 
     roles = _ordered_roles(dossier)
     if roles:
-        parts.append("<h2>PROFESSIONAL EXPERIENCE</h2>")
+        parts.append("<h2>" + _t("experience", lang) + "</h2>")
         for job in roles:
             parts.append('<div class="job">')
             parts.append('<div class="co">' + esc(_text(job.get("company")) or "Employer not stated") + "</div>")
@@ -367,7 +417,7 @@ def render_html(dossier: dict[str, Any]) -> str:
 
     education = [e for e in (dossier.get("education") or []) if isinstance(e, dict)]
     if education:
-        parts.append("<h2>EDUCATION</h2>")
+        parts.append("<h2>" + _t("education", lang) + "</h2>")
         for entry in education:
             line = " - ".join(
                 p for p in (
@@ -382,12 +432,12 @@ def render_html(dossier: dict[str, Any]) -> str:
 
     skills = [s for s in (dossier.get("skills") or []) if _text(s)]
     if skills:
-        parts.append("<h2>SKILLS</h2>")
+        parts.append("<h2>" + _t("skills", lang) + "</h2>")
         parts.append("<p>" + esc(", ".join(_text(s) for s in skills)) + "</p>")
 
     certifications = [c for c in (dossier.get("certifications") or []) if _text(c)]
     if certifications:
-        parts.append("<h2>CERTIFICATIONS</h2>")
+        parts.append("<h2>" + _t("certifications", lang) + "</h2>")
         for entry in certifications:
             parts.append("<p>" + esc(_text(entry)) + "</p>")
 
@@ -395,7 +445,7 @@ def render_html(dossier: dict[str, Any]) -> str:
     return "".join(parts)
 
 
-def render(dossier: dict[str, Any], fmt: str = "docx") -> tuple[bytes, str, str]:
+def render(dossier: dict[str, Any], fmt: str = "docx", lang: str = "en") -> tuple[bytes, str, str]:
     """Return (bytes, content-type, filename) for the requested format."""
     safe = "".join(
         c if c.isalnum() or c in " -_" else "" for c in (_text(dossier.get("name")) or "resume")
@@ -404,9 +454,9 @@ def render(dossier: dict[str, Any], fmt: str = "docx") -> tuple[bytes, str, str]
     stamp = datetime.now().strftime("%Y-%m-%d")
 
     if fmt == "html":
-        return render_html(dossier).encode("utf-8"), "text/html; charset=utf-8", f"{filename_base}-resume-{stamp}.html"
+        return render_html(dossier, lang).encode("utf-8"), "text/html; charset=utf-8", f"{filename_base}-resume-{stamp}.html"
     return (
-        render_docx(dossier),
+        render_docx(dossier, lang),
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         f"{filename_base}-resume-{stamp}.docx",
     )

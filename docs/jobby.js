@@ -8,6 +8,26 @@
  * is a portal or relay problem, not a CORS one.
  */
 
+
+/* The mission state is a machine value - the relay sends "seeking", "placed",
+ * "advancing" or "paused" - so this is a lookup by key rather than a
+ * translation of prose. A value the table does not know falls through to the
+ * English text, so a state added relay-side still shows something readable
+ * rather than a blank. */
+const JOBBY_MISSION_LABELS = {
+  seeking:   { en: 'No income secured. Every day counts.', es: 'Todavía no hay ingresos. Cada día cuenta.' },
+  placed:    { en: 'Income secured. Onward.', es: 'Ingresos asegurados. Ahora a por más.' },
+  advancing: { en: 'Moving up. Keep the pipeline warm.', es: 'Ascendiendo. Mantén el contacto vivo.' },
+  paused:    { en: 'Paused. Nothing is being sent.', es: 'En pausa. No se está enviando nada.' },
+};
+
+function missionLabel(state) {
+  var key = String(state == null ? '' : state).trim().toLowerCase();
+  var entry = JOBBY_MISSION_LABELS[key];
+  if (!entry) return key;
+  return (window.JobbyI18n && window.JobbyI18n.isSpanish()) ? entry.es : entry.en;
+}
+
 const jobbyState = {
   clientId: null,
   tracks: [],
@@ -55,10 +75,10 @@ const TRACK_NAMES = {
 };
 
 const MISSION_LABELS = {
-  seeking: 'No income secured. Every day counts.',
-  placed: 'Income secured. Protect it.',
-  advancing: 'Placed and pushing forward.',
-  paused: 'Paused.',
+  seeking: missionLabel('seeking'),
+  placed: missionLabel('placed'),
+  advancing: missionLabel('advancing'),
+  paused: missionLabel('paused'),
 };
 
 function jobbyEl(tag, className, text) {
@@ -139,8 +159,8 @@ function renderJobbyStatus(s) {
   if (jobbyEls['jobby-tracks']) {
     const active = (c.tracks || []).map(t => TRACK_NAMES[t] || ('Track ' + t));
     jobbyEls['jobby-tracks'].textContent = active.length
-      ? active.length + ' of 4 tracks active'
-      : 'No tracks active';
+      ? tn('{n} of {total} tracks active').replace('{n}', active.length).replace('{total}', 4)
+      : tn('No tracks active');
   }
   if (jobbyEls['jobby-autonomy']) jobbyEls['jobby-autonomy'].checked = c.autonomy === 'auto';
   if (jobbyEls['jobby-kill-switch']) jobbyEls['jobby-kill-switch'].checked = !!c.killSwitch;
@@ -157,7 +177,8 @@ function renderJobbyCap(sending) {
     el.textContent = `Sending stopped — ${s.reason}`;
     el.dataset.kind = 'error';
   } else {
-    el.textContent = `${s.sent ?? 0} of ${s.cap} sends used in the last 24 hours`;
+    el.textContent = tn('{used} of {cap} sends used in the last 24 hours')
+    .replace('{used}', s.sent ?? 0).replace('{cap}', s.cap);
     el.dataset.kind = 'neutral';
   }
 }

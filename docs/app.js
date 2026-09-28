@@ -26,9 +26,10 @@ async function parseResume(file) {
     setStatus(error, 'error');
     return null;
   }
-  setStatus('Parsing ' + file.name + '…', 'working');
+  setStatus(tn('Parsing') + ' ' + file.name + '…', 'working');
   try {
     const form = new FormData();
+    form.append('lang', currentLang());
     form.append('resume', file, file.name);
     form.append('format', file.name.split('.').pop().toLowerCase());
     const response = await fetch('/api/resume/parse', {
@@ -42,10 +43,10 @@ async function parseResume(file) {
     const dossier = result.dossier;
     if (dossier && dossier.request_id) {
       showDossierPending();
-      setStatus('Resume parsed. Building the dossier…', 'working');
+      setStatus(tn('Resume parsed. Building the dossier…'), 'working');
       pollDossier(dossier.request_id);
     } else {
-      setStatus('Resume parsed. Profile is ready for review.', 'success');
+      setStatus(tn('Resume parsed. Profile is ready for review.'), 'success');
     }
     return result;
   } catch (error) {
@@ -137,7 +138,7 @@ function renderDossier(profile) {
   const grid = el('div', 'parsed-profile-grid dossier-grid');
 
   const identity = [];
-  const name = profile.name || 'Name not stated';
+  const name = profile.name || tn('Name not stated');
   identity.push(el('p', 'dossier-name', name));
   if (profile.current_title || profile.current_company) {
     identity.push(el('p', 'dossier-role',
@@ -154,23 +155,24 @@ function renderDossier(profile) {
   const linkValues = [links.linkedin, links.github, links.portfolio, links.website]
     .concat(links.other || []).filter(Boolean);
   if (linkValues.length) identity.push(el('p', 'dossier-muted', linkValues.join(' · ')));
-  identity.push(el('p', 'dossier-confidence', 'Extraction confidence: ' + (profile.confidence || 'low')));
-  const identityCard = dossierCard('Identity', identity);
+  identity.push(el('p', 'dossier-confidence',
+    tn('Extraction confidence') + ': ' + confidenceLabel(profile.confidence)));
+  const identityCard = dossierCard(tn('Identity'), identity);
   if (identityCard) grid.appendChild(identityCard);
 
-  const summaryCard = dossierCard('Summary', [el('p', 'dossier-summary', profile.summary)]);
+  const summaryCard = dossierCard(tn('Summary'), [el('p', 'dossier-summary', profile.summary)]);
   if (summaryCard) grid.appendChild(summaryCard);
 
-  const skillsCard = dossierCard('Skills', [dossierList(profile.skills, 'None listed')]);
+  const skillsCard = dossierCard(tn('Skills'), [dossierList(profile.skills, tn('None listed'))]);
   if (skillsCard) grid.appendChild(skillsCard);
 
-  const fieldsCard = dossierCard('Job fields', [dossierList(profile.job_fields, 'None inferred')]);
+  const fieldsCard = dossierCard(tn('Job fields'), [dossierList(profile.job_fields, tn('None inferred'))]);
   if (fieldsCard) grid.appendChild(fieldsCard);
 
-  const expertiseCard = dossierCard('Domain expertise', [dossierList(profile.domain_expertise, null)]);
+  const expertiseCard = dossierCard(tn('Domain expertise'), [dossierList(profile.domain_expertise, null)]);
   if (expertiseCard) grid.appendChild(expertiseCard);
 
-  const certsCard = dossierCard('Certifications', [dossierList(profile.certifications, 'None listed')]);
+  const certsCard = dossierCard(tn('Certifications'), [dossierList(profile.certifications, tn('None listed'))]);
   if (certsCard) grid.appendChild(certsCard);
 
   const roles = Array.isArray(profile.target_roles) && profile.target_roles.length
@@ -178,9 +180,9 @@ function renderDossier(profile) {
     : profile.roles_in_resume;
   const rolesCard = dossierCard(
     Array.isArray(profile.target_roles) && profile.target_roles.length
-      ? 'Suggested target roles'
-      : 'Roles named in the resume',
-    [dossierList(roles, 'None listed')]);
+      ? tn('Suggested target roles')
+      : tn('Roles named in the resume'),
+    [dossierList(roles, tn('None listed'))]);
   if (rolesCard) grid.appendChild(rolesCard);
 
   dossierBody.appendChild(grid);
@@ -194,13 +196,13 @@ function renderDossier(profile) {
       const line = employmentLine(job);
       if (line) entry.appendChild(el('h3', null, line));
       if (job.team_size) {
-        entry.appendChild(el('p', 'dossier-muted', 'Team size: ' + job.team_size));
+        entry.appendChild(el('p', 'dossier-muted', tn('Team size') + ': ' + job.team_size));
       }
       const highlights = Array.isArray(job.highlights) ? job.highlights.filter(Boolean) : [];
       if (highlights.length) appendList(entry, dossierList(highlights, null));
       wrap.appendChild(entry);
     });
-    dossierBody.appendChild(el('h3', 'dossier-subhead', 'Experience'));
+    dossierBody.appendChild(el('h3', 'dossier-subhead', tn('Experience')));
     dossierBody.appendChild(wrap);
   }
 
@@ -212,30 +214,30 @@ function renderDossier(profile) {
     return ((degree || item.institution || '') + tail + year).trim();
   }).filter(Boolean);
   if (eduItems.length) {
-    dossierBody.appendChild(el('h3', 'dossier-subhead', 'Education'));
+    dossierBody.appendChild(el('h3', 'dossier-subhead', tn('Education')));
     appendList(dossierBody, dossierList(eduItems, null));
   }
 
   const achievements = Array.isArray(profile.achievements) ? profile.achievements.filter(Boolean) : [];
   if (achievements.length) {
-    dossierBody.appendChild(el('h3', 'dossier-subhead', 'Confirmed achievements'));
+    dossierBody.appendChild(el('h3', 'dossier-subhead', tn('Confirmed achievements')));
     appendList(dossierBody, dossierList(achievements, null));
   }
 
   // Present so the reader can see the limits of the extraction.
-  const gaps = Array.isArray(profile.not_stated) ? profile.not_stated.filter(Boolean) : [];
+  const gaps = gapList(profile.not_stated);
   if (gaps.length) {
-    dossierBody.appendChild(el('h3', 'dossier-subhead', 'Not stated in resume'));
+    dossierBody.appendChild(el('h3', 'dossier-subhead', tn('Not stated in resume')));
     appendList(dossierBody, dossierList(gaps, null));
   }
 
-  const flags = Array.isArray(profile.verification_flags) ? profile.verification_flags.filter(Boolean) : [];
+  const flags = gapList(profile.verification_flags);
   if (flags.length) {
-    dossierBody.appendChild(el('h3', 'dossier-subhead', 'Flagged for verification'));
+    dossierBody.appendChild(el('h3', 'dossier-subhead', tn('Flagged for verification')));
     appendList(dossierBody, dossierList(flags, null));
   }
 
-  dossierHeading.textContent = 'Dossier for ' + name;
+  dossierHeading.textContent = tn('Dossier for') + ' ' + name;
   dossierPanel.hidden = false;
   // The relay has already onboarded this dossier server-side, so the agent
   // panel can pick up the tracks, plan and change log without a page reload.
@@ -246,7 +248,7 @@ function renderDossierUnavailable(message) {
   if (!dossierPanel || !dossierBody) return;
   dossierBody.replaceChildren();
   dossierBody.appendChild(el('p', 'dossier-muted', message));
-  dossierHeading.textContent = 'Dossier unavailable';
+  dossierHeading.textContent = tn('Dossier unavailable');
   dossierPanel.hidden = false;
 }
 
@@ -296,6 +298,36 @@ function progressStepsTo(index, total) {
   }
 }
 
+/* The build-stage labels, translated by stage key.
+ *
+ * These live server-side in _DOSSIER_STAGES, which has one language, and a live
+ * Spanish build reported "Reading your details out of the document" while the
+ * summary it produced was in Spanish - so the progress bar was the only English
+ * on a page that had been switched.
+ *
+ * Keyed by the stage name rather than by the label, because the key is stable
+ * and machine-readable while the label is prose. Prose keys are what let an
+ * ellipsis-vs-full-stop mismatch through unnoticed earlier.
+ *
+ * The server's label is still used for English and as a fallback, so a stage
+ * added server-side and not yet translated shows its English label rather than
+ * disappearing. */
+const JOBBY_STAGE_LABELS = {
+  identity:  { es: 'Lee tus datos del documento' },
+  history:   { es: 'Desmonta tu historial laboral' },
+  interpret: { es: 'Determina qué respalda ese historial' },
+  reconcile: { es: 'Contrasta las fechas con el documento' },
+  verify:    { es: 'Decide qué puede afirmar y qué no' },
+  onboard:   { es: 'Construye tus rutas y tu plan' },
+};
+
+function stageLabel(progress) {
+  if (!progress) return '';
+  var entry = JOBBY_STAGE_LABELS[progress.stage];
+  if (entry && window.JobbyI18n && window.JobbyI18n.isSpanish()) return entry.es;
+  return progress.label || '';
+}
+
 function renderProgress(progress) {
   if (!progressBlock || !progress) return;
   progressBlock.hidden = false;
@@ -303,8 +335,9 @@ function renderProgress(progress) {
   const index = Math.min(Math.max(Number(progress.index) || 1, 1), total);
   progressTotal = total;
 
-  if (progressStage && progressStage.textContent !== progress.label) {
-    progressStage.textContent = progress.label || 'Working';
+  const label = stageLabel(progress) || tn('Working');
+  if (progressStage && progressStage.textContent !== label) {
+    progressStage.textContent = label;
   }
   if (progressCount) progressCount.textContent = index + ' of ' + total;
   if (progressTrack) {
@@ -375,9 +408,10 @@ function pollDossier(requestId) {
         '/api/resume/dossier?request_id=' + encodeURIComponent(requestId));
       const body = await response.json().catch(() => ({}));
       if (body.status === 'done') {
-        setStatus('Dossier ready.', 'success');
+        setStatus(tn('Dossier ready.'), 'success');
         // The bar is taken down only once the dossier is genuinely in hand.
         hideDossierProgress();
+        showDossierActions();
         renderDossier(body.profile);
         return;
       }
@@ -389,10 +423,10 @@ function pollDossier(requestId) {
         dossierTimer = setTimeout(tick, 1500);
         return;
       }
-      setStatus('Resume parsed. ' + (body.error || 'Dossier unavailable.'), 'error');
+      setStatus(tn('Resume parsed. ') + (body.error || tn('Dossier unavailable.')), 'error');
       // A failed build takes the bar down too, or it would sit there forever.
       hideDossierProgress();
-      renderDossierUnavailable(body.error || 'The dossier could not be built.');
+      renderDossierUnavailable(body.error || tn('The dossier could not be built.'));
     } catch (error) {
       // A dropped poll is not a failure; keep trying until the job expires.
       dossierTimer = setTimeout(tick, 2500);
@@ -427,3 +461,147 @@ fileInput.addEventListener('change', () => {
   parseResume(fileInput.files[0]);
   fileInput.value = '';
 });
+
+/* ------------------------------------------------------------- language ---- */
+// The toggle restores the stored language on load, flips on click, and re-applies
+// after anything that replaces a region's contents. That last part is the one
+// that is easy to miss: a language switch cannot survive content rendered later
+// in English, and the dossier, the tracks and the Google panel are all rendered
+// after load.
+(function wireLanguageToggle() {
+  var I18N = window.JobbyI18n;
+  var button = document.getElementById('lang-toggle');
+  if (!I18N || !button) return;
+
+  var TOGGLE_LABEL = { en: 'ES', es: 'EN' };
+  var TOGGLE_TITLE = {
+    en: 'Cambiar el idioma a espa&ntilde;ol',
+    es: 'Switch the language to English',
+  };
+
+  function paintToggle(lang) {
+    button.textContent = TOGGLE_LABEL[lang] || 'ES';
+    button.setAttribute('lang', lang === 'es' ? 'en' : 'es');
+    var title = (TOGGLE_TITLE[lang] || TOGGLE_TITLE.en).replace(/&ntilde;/g, 'ñ');
+    button.setAttribute('aria-label', title);
+    button.title = title;
+  }
+
+  function setLang(lang) {
+    var applied = I18N.setLang(lang);
+    paintToggle(applied);
+    return applied;
+  }
+
+  button.addEventListener('click', function () {
+    setLang(I18N.current() === 'es' ? 'en' : 'es');
+  });
+
+  // Anything rendered after a language switch asks to be re-rendered in it.
+  document.addEventListener('jobby:lang', function () { paintToggle(I18N.current()); });
+
+  setLang(I18N.getLang());
+})();
+
+// The language the server should write the dossier, resume and chat in. An
+// English resume in Spanish mode still yields a Spanish dossier, which is the
+// point of asking for a language at all.
+function currentLang() {
+  return (window.JobbyI18n && window.JobbyI18n.current()) || 'en';
+}
+
+// Translate and rename a string built at runtime.
+function tn(text) {
+  return (window.JobbyI18n && window.JobbyI18n.tn) ? window.JobbyI18n.tn(text) : text;
+}
+
+/* The download links exist before there is a dossier, and are only revealed once
+ * there is one. The language is stamped onto the href rather than baked into it,
+ * so switching to Spanish and then downloading gives a Spanish CV instead of an
+ * English one - which is the whole reason the endpoint reads ?lang=. */
+function showDossierActions() {
+  var actions = document.getElementById('dossier-actions');
+  if (actions) actions.hidden = false;
+  stampDownloadLanguage();
+}
+
+function stampDownloadLanguage() {
+  var lang = currentLang();
+  var doc = document.getElementById('resume-download');
+  var print = document.getElementById('resume-print');
+  if (doc) {
+    doc.href = '/api/resume/document?lang=' + encodeURIComponent(lang);
+    doc.textContent = tn('Download your resume');
+  }
+  if (print) {
+    print.href = '/api/resume/document?format=html&lang=' + encodeURIComponent(lang);
+    print.textContent = tn('Print or save as PDF');
+  }
+}
+
+document.addEventListener('jobby:lang', stampDownloadLanguage);
+
+/* ------------------------------------------------- dossier string helpers ---- */
+// The dossier stores machine keys in English - "low", "phone", "employment" -
+// because the relay, the renderer and the page agent all read them. Translating
+// them at the point of display is what lets a Spanish panel show Spanish without
+// a migration or an audit of every consumer. The panel used to print the raw
+// key, so an English word leaked into the Spanish dossier.
+
+// Confidence: a key in, a word out.
+const JOBBY_CONFIDENCE = {
+  high: { en: 'High', es: 'Alta' },
+  medium: { en: 'Medium', es: 'Media' },
+  low: { en: 'Low', es: 'Baja' },
+};
+
+function confidenceLabel(value) {
+  var key = String(value == null ? '' : value).trim().toLowerCase();
+  var entry = JOBBY_CONFIDENCE[key];
+  if (!entry) return key;
+  return (window.JobbyI18n && window.JobbyI18n.isSpanish()) ? entry.es : entry.en;
+}
+
+// Gaps and verification flags, stored as English field names.
+const JOBBY_GAP_LABELS = {
+  phone: { en: 'phone', es: 'teléfono' },
+  email: { en: 'email', es: 'correo electrónico' },
+  location: { en: 'location', es: 'ubicación' },
+  name: { en: 'name', es: 'nombre' },
+  links: { en: 'links', es: 'enlaces' },
+  summary: { en: 'summary', es: 'resumen' },
+  skills: { en: 'skills', es: 'habilidades' },
+  employment: { en: 'employment history', es: 'historial laboral' },
+  education: { en: 'education', es: 'formación' },
+  certifications: { en: 'certifications', es: 'certificaciones' },
+  achievements: { en: 'achievements', es: 'logros' },
+  experience_years: { en: 'years of experience', es: 'años de experiencia' },
+  portfolio: { en: 'portfolio', es: 'portafolio' },
+  current_company: { en: 'current employer', es: 'empleador actual' },
+  current_title: { en: 'current role', es: 'puesto actual' },
+};
+
+function gapLabel(value) {
+  var key = String(value == null ? '' : value).trim().toLowerCase();
+  var entry = JOBBY_GAP_LABELS[key];
+  if (entry) return (window.JobbyI18n && window.JobbyI18n.isSpanish()) ? entry.es : entry.en;
+  // Not a known key: a sentence of prose the model wrote, so it passes through.
+  return value;
+}
+
+function gapList(values) {
+  if (!Array.isArray(values)) return [];
+  return values.map(gapLabel);
+}
+
+// The years figure, with the unit in the reader's language. The number itself is
+// the same in both; only the noun changes, and it has to agree with the noun in
+// the sentence it appears in, which is why this is a string and not a number
+// format.
+function yearsLabel(years) {
+  if (years == null || years === '') return '';
+  if (window.JobbyI18n && window.JobbyI18n.isSpanish()) {
+    return years + (Number(years) === 1 ? ' año de experiencia' : ' años de experiencia');
+  }
+  return years + (Number(years) === 1 ? ' yr experience' : ' yrs experience');
+}

@@ -6,6 +6,7 @@
   <title>Jobby McJobberson — The Intelligent Opportunity Command Center</title>
   <meta name="description" content="Jobby McJobberson is a multi-track opportunity and outreach engine for precision career orchestration.">
   <link rel="stylesheet" href="styles.css">
+  <script src="i18n.js" defer></script>
 </head>
 <body>
   <header class="site-header">
@@ -20,6 +21,13 @@
       <a href="#funnel">Funnel</a>
       <a href="#tracks">Tracks</a>
       <a href="#audit">Audit</a>
+      <!-- The label is the language being switched TO, which is the
+           convention that actually helps: someone who cannot read the
+           language currently on screen still recognises the word for
+           their own. A bare "ES" / "EN" flag tells a Spanish speaker
+           nothing at all. -->
+      <button type="button" id="lang-toggle" class="lang-toggle"
+              aria-label="Cambiar el idioma a espa&ntilde;ol">ES</button>
       <a class="button button-small" href="#resume-drop-zone">Get started</a>
     </nav>
   </header>
@@ -41,7 +49,7 @@
       <div class="hero-inner">
         <div class="hero-copy">
           <p class="eyebrow">A personal agent for your job search</p>
-          <h1>It does the work. You stay in charge.</h1>
+          <h1>Jobby does the work. You stay in charge.</h1>
           <p class="lede">Upload your resume and Jobby takes it from there: it reads the market, decides what is worth chasing, writes the outreach, fills in the applications, and comes back to you on the ones it will not guess at.</p>
           <ul class="hero-points">
             <li>Reads your resume properly, then keeps it current as you correct it</li>
@@ -112,6 +120,16 @@
           </div>
           <ol class="dp-steps" id="dp-steps"></ol>
           <p class="dp-note" id="dp-note"></p>
+        </div>
+        <!-- Shown only once a dossier exists. Hidden by default rather
+             than rendered-then-hidden so it is never in the tab order
+             for someone who has not uploaded anything yet. -->
+        <div class="dossier-actions" id="dossier-actions" hidden>
+          <a class="button" id="resume-download" href="/api/resume/document"
+             download>Download your resume</a>
+          <a class="button button-quiet" id="resume-print"
+             href="/api/resume/document?format=html" target="_blank"
+             rel="noopener">Print or save as PDF</a>
         </div>
         <div id="dossier-body"></div>
       </section>

@@ -41,9 +41,15 @@
     // window it sat in was white - so the whole layer was the colour of the
     // page underneath it, and no scrim thin enough to be worth having would
     // ever have made it visible. A background layer needs a ground of its own.
-    groundTop: '#dde6f3',
-    groundBottom: '#c4d3e8',
-    groundDot: 'rgba(71, 85, 105, 0.18)',
+    //
+    // Deeper than the obvious choice on purpose. The copy and the drop zone are
+    // frosted panels covering most of a phone's hero width, so the ground is
+    // seen *through* them rather than beside them. A ground pale enough to look
+    // unobtrusive on a wide screen passes through 46% white and leaves a tint
+    // too faint to read as anything at all. This has the tone to survive glass.
+    groundTop: '#c6d5ea',
+    groundBottom: '#a9bedb',
+    groundDot: 'rgba(51, 65, 85, 0.22)',
     page: '#f1f5f9',
     window: '#ffffff',
     chrome: '#e7edf6',

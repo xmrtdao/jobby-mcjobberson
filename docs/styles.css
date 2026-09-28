@@ -22,6 +22,40 @@ body {
   overflow-x: hidden; /* Prevent horizontal scroll on body */
 }
 
+/* Language toggle. Styled as a nav control rather than a button so it does not
+ * read as a call to action beside the real one. */
+.lang-toggle {
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.3rem 0.6rem;
+  cursor: pointer;
+  transition: color 150ms ease, border-color 150ms ease, background 150ms ease;
+}
+
+.lang-toggle:hover {
+  color: var(--primary);
+  border-color: var(--primary);
+  background: var(--accent);
+}
+
+.lang-toggle:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* On a phone the nav has to fit: the three section links collapse away and the
+ * toggle stays, because a candidate whose first language is not English needs
+ * the switch more than the internal navigation does. */
+@media (max-width: 640px) {
+  .lang-toggle { padding: 0.34rem 0.66rem; }
+}
+
 /* --- Header & Nav --- */
 .site-header {
   display: flex;
@@ -177,26 +211,40 @@ nav a:hover { color: var(--primary); }
   transform-origin: 50% 42%;
 }
 
-/* Legibility.
+/* On a phone the hero is tall and narrow, so the scene drawn for a wide hero
+ * arrives small and fine, and reads as paper texture rather than as a screen
+ * working. Scaled up it becomes legible as shapes and motion - which is what a
+ * background layer has to be. Blur is eased off to match, since at this size
+ * there are no small glyphs left to dissolve. */
+@media (max-width: 560px) {
+  .hero-bg canvas {
+    transform: scale(1.45);
+    filter: blur(1.1px);
+  }
+}
+
+/* Legibility, written for the stacked layout rather than adapted to it.
  *
- * Deliberately thin. It used to be 98-99% opaque across most of the hero, which
- * is what buried the scene: the layer was there, animating, and completely
- * invisible. Its only job now is to take the edge off the scene where the copy
- * sits, because the copy carries its own backing and does not need the scrim to
- * be readable.
+ * This used to be an angled left-to-right gradient, which is right for the
+ * desktop two-column split where the text occupies the left. Stacked, the
+ * content is centred, so an angled scrim is densest over the empty field at one
+ * edge and thinnest over the words at the other - precisely inverted, and the
+ * reason the animation was invisible on a phone.
  *
- * Angled rather than uniform because the two columns are not equal: the text
- * wants a calmer patch on the left, and the drop zone is a solid card that
- * needs none at all. */
+ * Radial, centred on the content, is the shape the stacked layout actually
+ * needs: firmest where the words are, thinning outwards so the field comes back
+ * at the top and bottom of the hero where nothing is written. The 900px block
+ * below replaces this with an angled gradient, which is correct once there are
+ * two unequal columns. */
 .hero-scrim {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(96deg,
-      rgba(248, 250, 252, 0.72) 0%,
-      rgba(248, 250, 252, 0.58) 40%,
-      rgba(248, 250, 252, 0.34) 72%,
-      rgba(248, 250, 252, 0.22) 100%);
+    radial-gradient(128% 76% at 50% 44%,
+      rgba(248, 250, 252, 0.9) 0%,
+      rgba(248, 250, 252, 0.78) 38%,
+      rgba(248, 250, 252, 0.52) 68%,
+      rgba(248, 250, 252, 0.3) 100%);
 }
 
 .hero-inner {
@@ -204,7 +252,7 @@ nav a:hover { color: var(--primary); }
   z-index: 2;
   display: flex;
   flex-direction: column;
-  gap: 2.25rem;
+  gap: 1.75rem;
   text-align: center;
 }
 
@@ -222,11 +270,16 @@ nav a:hover { color: var(--primary); }
   margin: 0 auto;
   padding: 1.4rem 1.5rem 1.55rem;
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.62);
-  border: 1px solid rgba(255, 255, 255, 0.7);
+  /* Translucent, because on a phone this card covers most of the hero's width
+   * and a near-opaque panel leaves the scene visible only in slivers at the
+   * edges. The field is meant to be seen *through* the content, not around it.
+   * The opacity is bounded by the heading's contrast ratio against the
+   * composited result, which _test_mobile_hero.py asserts rather than trusts. */
+  background: rgba(255, 255, 255, 0.32);
+  border: 1px solid rgba(255, 255, 255, 0.45);
   box-shadow: 0 18px 42px -26px rgba(15, 23, 42, 0.45);
-  -webkit-backdrop-filter: blur(18px) saturate(1.15);
-  backdrop-filter: blur(18px) saturate(1.15);
+  -webkit-backdrop-filter: blur(14px) saturate(1.25);
+  backdrop-filter: blur(14px) saturate(1.25);
 }
 
 .hero h1 {
@@ -274,17 +327,25 @@ nav a:hover { color: var(--primary); }
 }
 
 /* The drop zone is part of the hero composition, so it carries its own
- * surface: the background behind it is an animation, not a page. */
+ * surface: the background behind it is an animation, not a page.
+ *
+ * Frosted rather than solid, for the same reason the copy panel is: on a phone
+ * this card spans nearly the whole hero, and a solid one would hide the scene
+ * completely. It is held a little more opaque than the copy panel because it
+ * carries a dashed drop target and a status line whose small text needs more
+ * help against a moving background. */
 .resume-drop-zone {
   width: 100%;
   max-width: 34rem;
   margin: 0 auto;
   text-align: center;
-  background: var(--white);
-  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.55);
   border-radius: 16px;
   padding: 1.25rem;
   box-shadow: 0 14px 34px -18px rgba(15, 23, 42, 0.35);
+  -webkit-backdrop-filter: blur(14px) saturate(1.25);
+  backdrop-filter: blur(14px) saturate(1.25);
 }
 
 /* The act label and the pause control float over the scene rather than
@@ -723,6 +784,30 @@ nav a:hover { color: var(--primary); }
   .site-footer { padding: 4rem 2rem; }
 }
 
+/* The download controls, shown once there is something to download. */
+.dossier-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 0 0 1.5rem;
+}
+
+.dossier-actions[hidden] { display: none; }
+
+/* The print option is a secondary path, so it is styled as one: a real reader
+ * may want to save a PDF and keep their own margins and fonts. */
+.button-quiet {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+.button-quiet:hover {
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+
 /* --- Dossier build progress ----------------------------------------------
  * Shown while the dossier is constructed, which is 10-90s. Two layers: the bar
  * itself, and the list of stages. The list is the part that reassures - naming
@@ -940,6 +1025,22 @@ nav a:hover { color: var(--primary); }
 .parsed-profile-section {
   width: 100%;
   margin-top: 2rem;
+  /* Left, because the content is data. Education, the confirmed achievements,
+   * the job history: these are lists a candidate reads down a column, and
+   * centred list items with ragged left edges are measurably slower to scan and
+   * look wrong besides.
+   *
+   * It was centred, and .parsed-profile-grid below papered over it for the three
+   * signal cards - but #dossier-body is a sibling of that grid rather than a
+   * child, so the dossier cards inherited the centring and the override never
+   * reached them. Fixed at the section so a new block cannot reintroduce it. */
+  text-align: left;
+}
+
+/* The section intro stays centred: it is a heading and a sentence, not a list,
+ * and centring it is a deliberate choice about the page rather than an accident
+ * inherited from a container. */
+.parsed-profile-section .section-heading {
   text-align: center;
 }
 

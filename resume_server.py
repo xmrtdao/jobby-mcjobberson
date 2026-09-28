@@ -63,9 +63,9 @@ _STATIC_CONTENT_TYPES = {
     ".pdf": "application/pdf",
     ".txt": "text/plain; charset=utf-8",
 }
-_STATIC_ASSETS = {"index.html", "styles.css", "app.js", "jobby.js", "hero-scene.js"}
+_STATIC_ASSETS = {"index.html", "styles.css", "app.js", "jobby.js", "hero-scene.js", "i18n.js"}
 # The assets that get a version stamp in the entry point's markup.
-_VERSIONED_ASSETS = ("app.js", "styles.css", "jobby.js", "hero-scene.js")
+_VERSIONED_ASSETS = ("app.js", "styles.css", "jobby.js", "hero-scene.js", "i18n.js")
 _SECURITY_HEADERS = {
     "Content-Security-Policy": (
         "default-src 'self'; script-src 'self'; "
@@ -118,6 +118,73 @@ _no_redirect_opener = urllib.request.build_opener(_NoRedirect)
 
 
 # -- upload parsing ----------------------------------------------------------
+
+
+# --- output language ---------------------------------------------------------
+#
+# The site has a language toggle and the product has to honour it. A toggle that
+# only rewrites the page copy translates the marketing, not the product: what a
+# candidate actually reads is the dossier, the rendered resume and what the agent
+# says back, and all three are written by the model.
+#
+# Only prose the model authors is translated. Field names stay English, because
+# they are stored in the database and read by the relay, the renderer and the
+# page agent; renaming them would mean a migration, an audit of every consumer,
+# and it would orphan every dossier already on file. The client renders those
+# names through the same dictionary.
+
+_LANG_RULES = {
+    "en": (
+        "Write every value in English, including the professional summary, the "
+        "highlights and the achievements. Leave the field names exactly as the "
+        "schema spells them."
+    ),
+    "es": (
+        "IMPORTANT: write every value in Spanish. The candidate's resume may be "
+        "in English, and that does not change what you output: the professional "
+        "summary, every highlight, every achievement and every rationale must be "
+        "written in Spanish, in natural professional Spanish, rather than a "
+        "word-for-word translation. Keep proper nouns, employer names, job titles "
+        "as the document states them, certifications, acronyms, technology names "
+        "and URLs exactly as they appear. Translate only descriptive prose. Leave "
+        "the field names exactly as the schema spells them, in English - they are "
+        "keys, not text."
+    ),
+}
+
+
+def _normalise_lang(value: Any) -> str:
+    """The languages offered, and nothing else.
+
+    An unrecognised value falls back to English rather than passing through into
+    the prompt: a stray "fr" would otherwise become an instruction the model tries
+    to satisfy, with no French copy anywhere on the site to show for it.
+    """
+    if isinstance(value, str):
+        head = value.strip().casefold()[:2]
+        if head in ("es", "en"):
+            return head
+    return "en"
+
+
+def _language_rule(lang: str) -> str:
+    return _LANG_RULES.get(_normalise_lang(lang), _LANG_RULES["en"])
+
+
+def _query_value(query: str, name: str) -> str | None:
+    """One parameter out of a raw query string, or None.
+
+    Used where a bad value must fall through to a default rather than raise: the
+    language in particular, because an unrecognised one should mean English
+    rather than a 400 on the candidate's download.
+    """
+    for part in (query or "").split("&"):
+        if "=" not in part:
+            continue
+        key, _, value = part.partition("=")
+        if unquote(key.strip()) == name:
+            return unquote(value.strip())
+    return None
 
 
 def _safe_filename(value: str | None) -> str:
@@ -232,10 +299,15 @@ def _extract_resume_upload(
             payload,
             part_content_type,
             fields.get("format") or fields.get("hint") or hint,
+            # The non-file parts travel with the payload rather than being read
+            # again by the caller. The language the reader asked for arrives as
+            # one of them, and re-parsing the multipart body at the call site to
+            # reach a single field would mean walking it twice for no reason.
+            fields,
         )
 
     filename = _safe_filename(header_filename)
-    return filename, body, content_type, hint
+    return filename, body, content_type, hint, fields
 
 
 # -- model access ------------------------------------------------------------
@@ -1299,6 +1371,7 @@ def _build_dossier(
     filename: str,
     ingested: dict[str, Any],
     on_progress: Any = None,
+    lang: str = "en",
 ) -> dict[str, Any]:
     """Run the model passes, then lay the deterministic floor underneath.
 
@@ -1311,6 +1384,10 @@ def _build_dossier(
     show what is happening rather than an indeterminate spinner. It is a
     parameter rather than a global so this stays callable from a test without a
     job in the store, and so a caller that does not care pays nothing.
+
+    lang decides the language the model writes its prose in. The field names
+    stay English whatever it is set to, because they are keys rather than text -
+    see _LANG_RULES.
     """
     identity = history = interpret = {}
     failures: list[str] = []
@@ -1323,7 +1400,8 @@ def _build_dossier(
     ):
         prompt = (
             f"{schema}"
-            "Here is the resume. Answer with the JSON object only.\n\n"
+            "Here is the resume. Answer with the JSON object only.\n"
+            f"{_language_rule(lang)}\n\n"
             "=== RESUME ===\n"
             f"{text}\n"
             "=== END RESUME ===\n"
@@ -1490,12 +1568,14 @@ def _dossier_progress(request_id: str, stage: str, note: str = "") -> None:
 
 
 def _run_dossier_job(
-    request_id: str, text: str, filename: str, ingested: dict[str, Any], cookie: str | None
+    request_id: str, text: str, filename: str, ingested: dict[str, Any], cookie: str | None,
+    lang: str = "en",
 ) -> None:
     try:
         profile = _build_dossier(
             text, filename, ingested,
             on_progress=lambda stage, note="": _dossier_progress(request_id, stage, note),
+            lang=lang,
         )
         _dossier_progress(request_id, "verify")
         if not _dossier_is_useful(profile):
@@ -1525,7 +1605,15 @@ def _run_dossier_job(
         onboarding = _onboard_with_jobby(profile, filename, cookie)
         if isinstance(onboarding, dict) and onboarding:
             profile = {**profile, "onboarding": onboarding}
-        _dossier_job_put(request_id, {"status": "done", "profile": profile})
+        _dossier_job_put(request_id, {
+            "status": "done",
+            "profile": profile,
+            # Carried on the record rather than read from a cookie at render
+            # time: the candidate may switch language after uploading, and the
+            # resume they download should come back in the language they are
+            # currently reading the site in.
+            "lang": _normalise_lang(lang),
+        })
     except Exception as error:  # noqa: BLE001 - a job must never kill the thread
         _dossier_job_put(request_id, {
             "status": "error",
@@ -1633,7 +1721,7 @@ def create_server(
             try:
                 body = self._read_body()
                 content_type = self.headers.get("Content-Type", "")
-                filename, payload, part_content_type, hint = _extract_resume_upload(
+                filename, payload, part_content_type, hint, fields = _extract_resume_upload(
                     body,
                     content_type,
                     self.headers.get("X-File-Name"),
@@ -1656,10 +1744,16 @@ def create_server(
 
                 request_id = "dossier_" + uuid.uuid4().hex[:16]
                 cookie = self.headers.get("Cookie")
-                _dossier_job_put(request_id, {"status": "processing"})
+                # The language the reader asked for, read from the upload itself
+                # rather than from a cookie at build time: the build runs on a
+                # worker thread some seconds later, and by then a cookie would
+                # reflect whatever request arrived most recently rather than the
+                # one that asked for this resume.
+                lang = _normalise_lang(fields.get("lang"))
+                _dossier_job_put(request_id, {"status": "processing", "lang": lang})
                 thread = threading.Thread(
                     target=_run_dossier_job,
-                    args=(request_id, result.get("text", ""), filename, result, cookie),
+                    args=(request_id, result.get("text", ""), filename, result, cookie, lang),
                     daemon=True,
                 )
                 thread.start()
@@ -1755,8 +1849,15 @@ def create_server(
 
             query = urlsplit(self.path).query
             wanted = "html" if "format=html" in query else "docx"
+            # The downloadable CV follows the language the reader is currently
+            # on, not the language of the upload. Someone who read the dossier in
+            # Spanish and then downloads it should not be handed an English
+            # document, and the reverse is equally wrong. Read from the query
+            # rather than from the job record, so a switch takes effect on the
+            # next click instead of after another upload.
+            lang = _normalise_lang(_query_value(query, "lang"))
             try:
-                body, content_type, filename = resume_render.render(dossier, wanted)
+                body, content_type, filename = resume_render.render(dossier, wanted, lang)
             except RuntimeError as error:
                 self._write_json(503, {"error": str(error)})
                 return
@@ -1886,8 +1987,22 @@ def create_server(
                 return "0"
 
         def _stamp_asset_references(self, markup: str) -> str:
+            """Append a content stamp to every versioned asset reference.
+
+            Matches with or without a leading slash. It used to look only for a
+            bare quoted name, so an asset referenced as "/i18n.js" was never
+            stamped - and a browser kept serving the old module indefinitely
+            while the page showed the new markup around it. That is the same
+            failure as the scrambled deploy this stamping exists to prevent, one
+            slash away.
+
+            _test_static.py asserts that every versioned asset really does come
+            back stamped, which is the check whose absence let this ship.
+            """
             for asset in _VERSIONED_ASSETS:
-                markup = markup.replace(f'"{asset}"', f'"{asset}?v={self._asset_stamp(asset)}"')
+                stamp = f"?v={self._asset_stamp(asset)}"
+                for quoted in (f'"{asset}"', f'"/{asset}"'):
+                    markup = markup.replace(quoted, f'{quoted[:-1]}{stamp}"')
             return markup
 
         def _serve_static(self, request_path: str, send_body: bool) -> None:

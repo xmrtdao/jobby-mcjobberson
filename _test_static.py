@@ -15,6 +15,16 @@ sys.path.insert(0, ".")
 
 fails = []
 
+# The assets the server stamps, read from the server rather than copied. Copied,
+# this is the shape of the bug it guards: two lists that agree until somebody
+# edits only one of them. i18n.js was added to the server and not to the test's
+# own list, and was consequently the one asset nothing checked.
+try:
+    from resume_server import _VERSIONED_ASSETS as _VERSIONED_FOR_STAMP
+except Exception:  # noqa: BLE001 - reported by the checks below
+    _VERSIONED_FOR_STAMP = ("app.js", "styles.css", "jobby.js", "hero-scene.js", "i18n.js")
+
+
 
 def check(label, cond, detail=""):
     print(("  PASS  " if cond else "  FAIL  ") + label + ("" if cond else f"  -> {detail!r}"))
@@ -135,6 +145,32 @@ finally:
     server.shutdown()
     server.server_close()
     thread.join(timeout=5)
+
+# --- every versioned asset is stamped ---------------------------------------
+# The assertions above cover app.js, styles.css and jobby.js one at a time, and
+# i18n.js was never added to that list. It was also the one that went unstamped:
+# the script tag read src="/i18n.js" with a leading slash while the stamper
+# matched a bare quoted name, so a browser kept serving the original module
+# indefinitely. The symptom was a page in Spanish around a dossier whose headings
+# stayed English, and every dictionary key added after the first batch appearing
+# to do nothing.
+#
+# Driven by the server's own list rather than a copy, because that is the shape of
+# the bug: two lists that agree until somebody edits only one of them.
+print("\n--- every versioned asset is stamped ---")
+# The entry point the suite already read above, kept in `html`. Fetching it
+# again here would fail: this runs after server.shutdown(), so the test server is
+# already down.
+_referenced = set(re.findall(r'(?:src|href)="([^"?]+)(?:\?[^"]*)?"', html))
+# The character class includes the hyphen: hero-scene.js has one, and a class of
+# \w and . cannot match it - which made this assertion report a missing stamp on
+# an asset that is stamped correctly. A check that cries wolf is a check that
+# gets ignored.
+_stamp_of = dict(re.findall(r'([\w.-]+\.(?:js|css))\?v=(\d+)', html))
+for _asset in _VERSIONED_FOR_STAMP:
+    check("%s is referenced" % _asset, _asset in _referenced, sorted(_referenced))
+    check("%s carries a version stamp" % _asset, _asset in _stamp_of,
+          "no ?v= on %s, so a browser will keep serving the old file" % _asset)
 
 print()
 if fails:
