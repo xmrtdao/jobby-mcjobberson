@@ -305,9 +305,44 @@ async function patchJobbyClient(patch) {
   }
 }
 
+// Repopulate the resume dossier from the server.
+//
+// The dossier panel was only ever filled as a side effect of an upload, so a
+// refresh left it blank and read as though the record had been deleted. Nothing
+// had been deleted: the dossier is in the database and GET /api/jobby/dossier
+// returns it, it was simply never asked for on load. A candidate who refreshed
+// the page lost the visible copy of their own profile and had to upload their
+// resume again to see it, which is also how 23 duplicate client rows for one
+// person accumulated.
+function restoreDossierPanel() {
+  const body = document.getElementById('dossier-body');
+  const heading = document.getElementById('dossier-heading');
+  if (!body || typeof renderDossier !== 'function') return;
+  jobbyApi('GET', '/api/jobby/dossier')
+    .then((d) => {
+      if (!d || !d.dossier) return;
+      renderDossier(d.dossier);
+      if (heading) heading.textContent = 'Your dossier';
+    })
+    .catch(() => {
+      // No dossier, or the relay is down. The upload panel is still there, and
+      // a failed fetch is not worth an error banner over an empty page.
+    });
+}
+
 function initJobby() {
   cacheJobbyEls();
   if (!jobbyEls['jobby-form']) return;
+
+  // Repaint the resume dossier from the server on load.
+  //
+  // It used to appear only as a side effect of uploading a file, so a refresh
+  // emptied the panel and looked exactly like the dossier had been deleted. It
+  // had not: the record was in the database the whole time, and the agent panel
+  // beside it reloaded correctly, which made the empty resume panel read as data
+  // loss rather than as one missing fetch. renderDossier lives in app.js and
+  // shares this page's scope, so it is called directly.
+  restoreDossierPanel();
 
   jobbyEls['jobby-form'].addEventListener('submit', async (event) => {
     event.preventDefault();

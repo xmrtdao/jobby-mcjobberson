@@ -47,6 +47,7 @@ from resume_ingest import (
     _SUPPORTED_FORMATS,
     ingest_resume,
 )
+import resume_render
 
 
 _FORMATS_BY_CONTENT_TYPE = {
@@ -982,6 +983,9 @@ def create_server(
             if path == "/api/resume/dossier":
                 self._dossier_poll()
                 return
+            if path == "/api/resume/document":
+                self._render_document()
+                return
             if path.startswith(_JOBBY_PROXY_PREFIX):
                 self._proxy_to_relay("GET")
                 return
@@ -1116,6 +1120,83 @@ def create_server(
                 self._write_json(202, {"status": "processing"})
                 return
             self._write_json(200, {"status": "done", "profile": job.get("profile")})
+
+        # -- resume download --
+        def _render_document(self) -> None:
+            """Serve the dossier as a downloadable resume.
+
+            The dossier is read through the relay rather than from a local cache,
+            so the session cookie decides whose resume it is. Rendering a local
+            copy would mean a document built from whatever this server last
+            happened to parse, which for a multi-user portal is the wrong
+            person's CV.
+            """
+            try:
+                request = urllib.request.Request(
+                    f"{_JOBBY_RELAY_URL}/api/jobby/dossier",
+                    headers={"Accept": "application/json"},
+                    method="GET",
+                )
+                cookie = self.headers.get("Cookie")
+                if cookie:
+                    request.add_header("Cookie", cookie)
+                with urllib.request.urlopen(request, timeout=60) as response:
+                    payload = json.loads(response.read().decode("utf-8", "replace"))
+            except urllib.error.HTTPError as error:
+                self._write_json(
+                    error.code if 400 <= error.code < 600 else 502,
+                    {"error": "no dossier to download yet"},
+                )
+                return
+            except (urllib.error.URLError, TimeoutError, OSError, ValueError):
+                self._write_json(502, {"error": "the Jobby relay is unreachable"})
+                return
+
+            dossier = payload.get("dossier") if isinstance(payload, dict) else None
+            if not isinstance(dossier, dict) or not dossier:
+                self._write_json(404, {
+                    "error": "no dossier yet. Upload your resume first, then this builds.",
+                })
+                return
+
+            query = urlsplit(self.path).query
+            wanted = "html" if "format=html" in query else "docx"
+            try:
+                body, content_type, filename = resume_render.render(dossier, wanted)
+            except RuntimeError as error:
+                self._write_json(503, {"error": str(error)})
+                return
+
+            # as_path=1 writes the document to a temp file and answers with its
+            # location instead of the bytes. The page agent drives a real
+            # browser, and a file input needs a real file: it cannot attach
+            # something it was handed as base64, and asking it to download the
+            # resume first is a step that can fail in a dozen ways. Writing it
+            # here means the renderer stays in one place and the path handed to
+            # the agent is always the document this dossier actually produces.
+            if "as_path=1" in query:
+                directory = Path(tempfile.gettempdir()) / "jobby-resumes"
+                try:
+                    directory.mkdir(parents=True, exist_ok=True)
+                    target = directory / filename
+                    target.write_bytes(body)
+                except OSError as error:
+                    self._write_json(500, {"error": f"could not stage the resume: {error}"})
+                    return
+                self._write_json(200, {
+                    "path": str(target), "filename": filename, "bytes": len(body),
+                })
+                return
+
+            self.send_response(200)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self._send_security_headers()
+            self.end_headers()
+            self.wfile.write(body)
 
         # -- Jobby bridge --
         def _proxy_to_relay(self, method: str) -> None:
