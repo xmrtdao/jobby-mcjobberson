@@ -26,11 +26,14 @@ Three jobs live in this file, and they were separated on purpose:
 from __future__ import annotations
 
 import json
+import logging
+import logging.handlers
 import os
 import re
 import tempfile
 import threading
 import time
+import traceback
 import urllib.error
 import urllib.request
 import uuid
@@ -63,9 +66,53 @@ _STATIC_CONTENT_TYPES = {
     ".pdf": "application/pdf",
     ".txt": "text/plain; charset=utf-8",
 }
-_STATIC_ASSETS = {"index.html", "styles.css", "app.js", "jobby.js", "hero-scene.js", "i18n.js"}
-# The assets that get a version stamp in the entry point's markup.
-_VERSIONED_ASSETS = ("app.js", "styles.css", "jobby.js", "hero-scene.js", "i18n.js")
+# The two new pages and their scripts/stylesheets.
+#
+# The allowlist is explicit rather than a directory listing, and it has to be
+# extended by hand: dashboard.html and employers.html both 404'd on first serve
+# because this set still named only the candidate page's five files. That is the
+# allowlist doing its job — nothing is served because it happened to be on disk —
+# but it means a new page is invisible until it is named here, which is worth
+# knowing rather than rediscovering.
+_DASHBOARD_ASSETS = {
+    "dashboard.html", "dashboard.js", "dashboard.css",
+    "employers.html", "employer.js", "employer.css",
+    # The chat usability layer, ported from the Suite SPA's UnifiedChat. Named
+    # here for the same reason the others are: the allowlist is explicit, so a new
+    # file is invisible until it is listed, and a page that loads a script the
+    # server will not serve fails with a 404 that reads as a broken build.
+    "chat-experience.js",
+    # The floating conversation panel, and the stylesheet for its shell.
+    #
+    # Both are loaded by index.html *and* dashboard.html, which is the whole point
+    # of the change: the chat stopped being a section on one page. jobby.js is now
+    # shared for the same reason — it went from front-page-only to loaded on both —
+    # so it is listed once below rather than per page.
+    "jobby-chat-widget.js", "chat-widget.css",
+    # The jobs list on the front page, and its stylesheet. Listed explicitly for
+    # the same reason as everything else here: a script the allowlist does not name
+    # 404s, and a 404 reads as a broken build rather than as a missing entry.
+    "jobs.js", "jobs.css",
+}
+_STATIC_ASSETS = _DASHBOARD_ASSETS | {
+    "index.html", "styles.css", "app.js", "jobby.js", "hero-scene.js", "i18n.js",
+}
+# The assets that get a version stamp in the entry point's markup. Both new pages
+# are entry points, so their own assets need stamping too — without it a cached
+# dashboard.html can be paired with a stale dashboard.js, which is the exact
+# pairing the stamp exists to prevent.
+#
+# The widget is stamped for a second reason that matters more here: it builds the
+# chat's DOM at runtime, so a page holding a cached jobby-chat-widget.js against a
+# fresh jobby.js — or the reverse — produces a chat that renders and then sends
+# nothing, because the ids stopped lining up. A stale mix is silent; a stamped one
+# is a 404 that says so.
+_VERSIONED_ASSETS = (
+    "app.js", "styles.css", "jobby.js", "hero-scene.js", "i18n.js",
+    "dashboard.js", "dashboard.css", "employer.js", "employer.css",
+    "chat-experience.js", "jobby-chat-widget.js", "chat-widget.css",
+    "jobs.js", "jobs.css",
+)
 _SECURITY_HEADERS = {
     "Content-Security-Policy": (
         "default-src 'self'; script-src 'self'; "
@@ -91,9 +138,110 @@ _DOSSIER_JOBS_MAX = 40
 # forwards the browser's session cookie, so the browser never receives a relay
 # API key.
 _JOBBY_RELAY_URL = os.environ.get("JOBBY_RELAY_URL", "http://127.0.0.1:8080")
+
+# ── Logging ──────────────────────────────────────────────────────────────────
+#
+# This service had none. Every failure became a bare status code: a parse error
+# answered 500 "resume parsing failed", an unreachable relay answered 502, and
+# both left nothing on disk. That is not merely inconvenient — it is why a
+# download that worked minutes earlier could not be diagnosed at all, because the
+# one thing that would have said why was the thing that was missing.
+#
+# Everything below exists so that a failure names itself:
+#
+#   - every response is logged with its status and how long it took, so a slow or
+#     failing endpoint is visible without waiting for it to be reported
+#   - every exception is logged WITH its traceback, while the browser still only
+#     ever receives the short message. The traceback is the diagnostic; the
+#     response is the contract.
+#   - the document route logs which format was resolved and which was refused,
+#     because "you asked for a PDF and got a DOCX" is exactly the kind of failure
+#     that otherwise looks like success
+#   - relay reachability is logged separately from relay errors, because "the
+#     relay said no" and "the relay never answered" have opposite causes
+#
+# Rotating at 8 MB with 5 files. The log lives beside the server so it is found
+# next to the thing it describes.
+_LOG_DIR = Path(__file__).resolve().parent
+_LOG_PATH = Path(os.environ.get("RESUME_SERVER_LOG", str(_LOG_DIR / "resume_server.log")))
+
+
+def _build_logger() -> logging.Logger:
+    logger = logging.getLogger("resume_server")
+    if logger.handlers:
+        return logger
+    logger.setLevel(logging.DEBUG)
+    logger.propagate = False
+    try:
+        handler: logging.Handler = logging.handlers.RotatingFileHandler(
+            _LOG_PATH, maxBytes=8 * 1024 * 1024, backupCount=5, encoding="utf-8"
+        )
+        handler.setFormatter(logging.Formatter(
+            "%(asctime)s %(levelname)-7s %(name)s: %(message)s", "%Y-%m-%dT%H:%M:%S"
+        ))
+        logger.addHandler(handler)
+    except OSError as error:
+        # A log that cannot be written must not stop the portal from serving.
+        # Say so once, on stderr, and carry on without a file handler.
+        print(f"[resume_server] cannot write {_LOG_PATH}: {error}", flush=True)
+        logger.addHandler(logging.NullHandler())
+    return logger
+
+
+LOG = _build_logger()
+
+
+def _safe_error_body(error: Exception, limit: int = 300) -> str:
+    """The body of a failed HTTP response, for the log.
+
+    A relay that answers 500 with an empty body and a relay that answers 500
+    with a reason are different bugs, and the reason is usually only in the body.
+    Truncated, because an upstream error page can be enormous and the useful part
+    is at the front.
+    """
+    try:
+        body = error.read()  # type: ignore[attr-defined]
+    except Exception:  # noqa: BLE001 - the whole point is that this cannot fail
+        return "<no body readable>"
+    if isinstance(body, bytes):
+        try:
+            body = body.decode("utf-8", "replace")
+        except Exception:  # noqa: BLE001
+            return "<undecodable body>"
+    text = " ".join(str(body).split())
+    return text[:limit] if text else "<empty>"
 _JOBBY_SESSION_COOKIE = "jobby_sid"
 _JOBBY_PROXY_PREFIX = "/api/jobby/"
 _JOBBY_PROXY_TIMEOUT = 200
+
+# The employer side. A separate prefix and a separate cookie, for the same reason
+# the relay holds two cookies: one browser must never carry one identity across
+# both products. An HR person who opens the candidate page in a second tab would
+# otherwise find a job-seeker dossier they never created, and a candidate who
+# followed an employer link would find their applications attached to postings.
+_EMPLOYER_RELAY_URL = os.environ.get("JOBBY_RELAY_URL", "http://127.0.0.1:8080")
+_EMPLOYER_SESSION_COOKIE = "jobby_employer_sid"
+_EMPLOYER_PROXY_PREFIX = "/api/employer/"
+_EMPLOYER_PROXY_TIMEOUT = 200
+
+# A job description is a document strangers will read and act on, so the ceiling
+# is enforced before the file is opened rather than after it has been read.
+_MAX_JD_BYTES = 5 * 1024 * 1024
+_JD_TEXT_LIMIT = 200_000
+
+# The employer side. A separate prefix and a separate cookie, for the same reason
+# the relay has two cookies: one browser must never carry one identity across both
+# products. An HR person who opens the candidate page in a second tab would
+# otherwise find a job-seeker dossier they never created.
+_EMPLOYER_RELAY_URL = os.environ.get("JOBBY_RELAY_URL", "http://127.0.0.1:8080")
+_EMPLOYER_SESSION_COOKIE = "jobby_employer_sid"
+_EMPLOYER_PROXY_PREFIX = "/api/employer/"
+_EMPLOYER_PROXY_TIMEOUT = 200
+
+# A job description is a document a stranger will read and act on, so the size
+# ceiling is enforced before the file is opened rather than after.
+_MAX_JD_BYTES = 5 * 1024 * 1024
+_JD_TEXT_LIMIT = 200_000
 
 # How far the resume's own employment dates may exceed its stated years of
 # experience before the difference is worth raising. A year of slack absorbs
@@ -1657,6 +1805,9 @@ def create_server(
             if path.startswith(_JOBBY_PROXY_PREFIX):
                 self._proxy_to_relay("GET")
                 return
+            if path.startswith(_EMPLOYER_PROXY_PREFIX):
+                self._proxy_to_employer_relay("GET")
+                return
             self._serve_static(path, send_body=True)
 
         def do_HEAD(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
@@ -1667,33 +1818,54 @@ def create_server(
             if path.startswith(_JOBBY_PROXY_PREFIX):
                 self._proxy_to_relay("HEAD")
                 return
+            if path.startswith(_EMPLOYER_PROXY_PREFIX):
+                self._proxy_to_employer_relay("HEAD")
+                return
             self._serve_static(path, send_body=False)
 
         def do_POST(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
             path = urlsplit(self.path).path
+            if path == "/api/employer/jd/parse":
+                self._parse_job_description()
+                return
             if path != "/api/resume/parse":
                 if path.startswith(_JOBBY_PROXY_PREFIX):
                     self._proxy_to_relay("POST")
+                    return
+                if path.startswith(_EMPLOYER_PROXY_PREFIX):
+                    self._proxy_to_employer_relay("POST")
                     return
                 self._write_json(404, {"error": "not found"})
                 return
             self._parse_resume()
 
         def do_PATCH(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
-            if urlsplit(self.path).path.startswith(_JOBBY_PROXY_PREFIX):
+            path = urlsplit(self.path).path
+            if path.startswith(_JOBBY_PROXY_PREFIX):
                 self._proxy_to_relay("PATCH")
+                return
+            if path.startswith(_EMPLOYER_PROXY_PREFIX):
+                self._proxy_to_employer_relay("PATCH")
                 return
             self._write_json(404, {"error": "not found"})
 
         def do_PUT(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
-            if urlsplit(self.path).path.startswith(_JOBBY_PROXY_PREFIX):
+            path = urlsplit(self.path).path
+            if path.startswith(_JOBBY_PROXY_PREFIX):
                 self._proxy_to_relay("PUT")
+                return
+            if path.startswith(_EMPLOYER_PROXY_PREFIX):
+                self._proxy_to_employer_relay("PUT")
                 return
             self._write_json(404, {"error": "not found"})
 
         def do_DELETE(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
-            if urlsplit(self.path).path.startswith(_JOBBY_PROXY_PREFIX):
+            path = urlsplit(self.path).path
+            if path.startswith(_JOBBY_PROXY_PREFIX):
                 self._proxy_to_relay("DELETE")
+                return
+            if path.startswith(_EMPLOYER_PROXY_PREFIX):
+                self._proxy_to_employer_relay("DELETE")
                 return
             self._write_json(404, {"error": "not found"})
 
@@ -1766,7 +1938,7 @@ def create_server(
             except (FileNotFoundError, ValueError, OSError, TypeError) as error:
                 self._write_json(400, {"error": str(error)})
             except Exception:  # noqa: BLE001 - never leak a traceback to a browser
-                self._write_json(500, {"error": "resume parsing failed"})
+                self._fail(500, "resume parsing failed")
 
         def _dossier_poll(self) -> None:
             query = urlsplit(self.path).query
@@ -1831,13 +2003,31 @@ def create_server(
                 with urllib.request.urlopen(request, timeout=60) as response:
                     payload = json.loads(response.read().decode("utf-8", "replace"))
             except urllib.error.HTTPError as error:
-                self._write_json(
+                # The relay answered, and the answer was no. That is a different
+                # problem from the relay not answering, and the two used to look
+                # identical from outside.
+                LOG.warning(
+                    "relay refused the dossier: HTTP %s %s body=%s",
+                    error.code, error.reason, _safe_error_body(error),
+                )
+                self._fail(
                     error.code if 400 <= error.code < 600 else 502,
-                    {"error": "no dossier to download yet"},
+                    "no dossier to download yet",
+                    relay=_JOBBY_RELAY_URL, relay_status=error.code,
                 )
                 return
-            except (urllib.error.URLError, TimeoutError, OSError, ValueError):
-                self._write_json(502, {"error": "the Jobby relay is unreachable"})
+            except (urllib.error.URLError, TimeoutError, OSError, ValueError) as error:
+                # The relay never answered. Previously this was a bare 502 with
+                # nothing recorded, which is why a download that had worked could
+                # not be diagnosed at all.
+                LOG.error(
+                    "cannot reach the Jobby relay at %s: %s: %s",
+                    _JOBBY_RELAY_URL, type(error).__name__, error,
+                )
+                self._fail(
+                    502, "the Jobby relay is unreachable",
+                    relay=_JOBBY_RELAY_URL, cause=type(error).__name__,
+                )
                 return
 
             dossier = payload.get("dossier") if isinstance(payload, dict) else None
@@ -1848,7 +2038,35 @@ def create_server(
                 return
 
             query = urlsplit(self.path).query
-            wanted = "html" if "format=html" in query else "docx"
+            # This used to be: wanted = "html" if "format=html" in query else "docx"
+            # A substring test with a default, which meant every other value —
+            # format=pdf above all — quietly became a DOCX. A caller asking for a
+            # PDF got a Word file with a .docx filename and no error, and since
+            # this is the file a candidate sends to an employer, "silently wrong"
+            # is the worst outcome available here.
+            #
+            # An explicit format that this server cannot build is now refused with
+            # a 400 that says so, rather than answered with a different document.
+            requested = _query_value(query, "format")
+            if requested is None:
+                wanted = "docx"
+            else:
+                wanted = requested.strip().lower()
+                if wanted not in ("docx", "html"):
+                    LOG.info(
+                        "refusing format=%s: this server builds docx and html only",
+                        wanted,
+                    )
+                    self._write_json(400, {
+                        "error": (
+                            f"this server cannot build a {wanted} resume yet. "
+                            "It builds .docx, and .html to print to PDF yourself. "
+                            "No PDF renderer is installed, so nothing was sent - "
+                            "better to say so than to hand over a Word file."
+                        ),
+                        "supported": ["docx", "html"],
+                    })
+                    return
             # The downloadable CV follows the language the reader is currently
             # on, not the language of the upload. Someone who read the dossier in
             # Spanish and then downloads it should not be handed an English
@@ -1893,6 +2111,132 @@ def create_server(
             self.end_headers()
             self.wfile.write(body)
 
+        # -- employer side --
+        def _parse_job_description(self) -> None:
+            """Turn an uploaded job description into text, then let the relay parse it.
+
+            The parse itself belongs to the relay, which owns relay/jobby/jd.mjs
+            and the title library it reads. What happens here is only the part
+            that needs a document reader: take the bytes, get the text out, and
+            hand it over.
+
+            The text is read by the same ingest path the resume uses, rather than a
+            new one. A second extractor would be a second set of PDF quirks, and
+            the quirks are where a parser quietly returns a page of nothing.
+            """
+            try:
+                body = self._read_body()
+                content_type = self.headers.get("Content-Type", "")
+                filename, payload, part_content_type, hint, fields = _extract_resume_upload(
+                    body, content_type,
+                    self.headers.get("X-File-Name"),
+                    self.headers.get("X-Format-Hint"),
+                )
+                if len(payload) > _MAX_JD_BYTES:
+                    raise ValueError("that file is larger than 5 MB")
+                jd_format = _format_for_request(filename, part_content_type, hint)
+
+                with tempfile.NamedTemporaryFile(suffix=f".{jd_format}", delete=False) as upload:
+                    upload.write(payload)
+                    upload_path = Path(upload.name)
+                try:
+                    result = ingest_resume(upload_path, hint=jd_format)
+                finally:
+                    upload_path.unlink(missing_ok=True)
+
+                text = (result.get("text") or "").strip()
+                if not text:
+                    # Named precisely. "Upload failed" sends an employer back to
+                    # the file picker; "this looks like a scanned image" tells
+                    # them to paste the text instead, which they can do.
+                    self._write_json(422, {
+                        "error": "No text could be read from that file. If it is a "
+                                 "scanned image or a screenshot, paste the text into "
+                                 "the box instead — that works.",
+                    })
+                    return
+                if len(text) > _JD_TEXT_LIMIT:
+                    self._write_json(413, {
+                        "error": f"That description is {len(text):,} characters. "
+                                 f"Trim it to the actual posting, under {_JD_TEXT_LIMIT:,}.",
+                    })
+                    return
+
+                self._forward_employer_json(
+                    "/api/employer/parse",
+                    {
+                        "text": text,
+                        "title": fields.get("title"),
+                        "company": fields.get("company"),
+                        "apply_url": fields.get("apply_url"),
+                        "contact_email": fields.get("contact_email"),
+                    },
+                )
+            except (FileNotFoundError, ValueError, OSError, TypeError) as error:
+                self._write_json(400, {"error": str(error)})
+            except Exception:  # noqa: BLE001 - never leak a traceback to a browser
+                self._fail(500, "could not read that job description")
+
+        def _forward_employer_json(self, path: str, payload: dict[str, Any]) -> None:
+            """POST a JSON body to the relay's employer surface."""
+            request = urllib.request.Request(
+                f"{_EMPLOYER_RELAY_URL}{path}",
+                data=json.dumps(payload).encode("utf-8"),
+                headers={
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                },
+                method="POST",
+            )
+            cookie = self.headers.get("Cookie")
+            if cookie:
+                request.add_header("Cookie", cookie)
+            try:
+                with urllib.request.urlopen(request, timeout=_EMPLOYER_PROXY_TIMEOUT) as response:
+                    raw = response.read()
+                    self._relay_response(response.status, response, "POST",
+                                         override_body=raw)
+            except urllib.error.HTTPError as error:
+                self._relay_response(error.code, error, "POST")
+            except (urllib.error.URLError, TimeoutError, OSError):
+                self._write_json(502, {"error": "the Jobby relay is unreachable"})
+
+        def _proxy_to_employer_relay(self, method: str) -> None:
+            """Forward an /api/employer/* call to the relay, cookie and all.
+
+            A copy of the candidate bridge rather than a shared one, because the
+            two differ in the only part that matters: which cookie identifies
+            them. Merging them would mean a single prefix that resolves whichever
+            identity arrived first, which is precisely the mistake the two
+            cookies exist to prevent.
+            """
+            path = self.path
+            length = int(self.headers.get("Content-Length", "0") or 0)
+            body = self.rfile.read(length) if length > 0 else None
+
+            headers = {"Accept": self.headers.get("Accept", "application/json")}
+            if body is not None:
+                headers["Content-Type"] = self.headers.get(
+                    "Content-Type", "application/json"
+                )
+            cookie = self.headers.get("Cookie")
+            if cookie:
+                headers["Cookie"] = cookie
+
+            request = urllib.request.Request(
+                f"{_EMPLOYER_RELAY_URL}{path}",
+                data=body,
+                headers=headers,
+                method=method,
+            )
+            try:
+                with _no_redirect_opener.open(request, timeout=_EMPLOYER_PROXY_TIMEOUT) as response:
+                    self._relay_response(response.status, response, method)
+            except urllib.error.HTTPError as error:
+                self._relay_response(error.code, error, method)
+            except (urllib.error.URLError, TimeoutError, OSError):
+                self._write_json(502, {"error": "the Jobby relay is unreachable"})
+
         # -- Jobby bridge --
         def _proxy_to_relay(self, method: str) -> None:
             """Forward a /api/jobby/* call to the relay, cookie and all.
@@ -1934,8 +2278,20 @@ def create_server(
                     "detail": str(error)[:200],
                 })
 
-        def _relay_response(self, status: int, response: Any, method: str) -> None:
-            raw = response.read()
+        def _relay_response(
+            self,
+            status: int,
+            response: Any,
+            method: str,
+            override_body: bytes | None = None,
+        ) -> None:
+            # `override_body` lets a caller hand over a body it has already read.
+            # The employer JD route needs it because the relay's own Set-Cookie
+            # has to be forwarded from that same response, and re-reading a
+            # consumed stream to get it is not possible. Without this parameter
+            # the new route would have to duplicate the whole header block, and a
+            # copy of the security headers is a copy that eventually misses one.
+            raw = override_body if override_body is not None else response.read()
             content_type = response.headers.get("Content-Type", "application/json")
             location = response.headers.get("Location", "")
             set_cookie = response.headers.get("Set-Cookie", "")
@@ -2019,7 +2375,12 @@ def create_server(
                 path.suffix.lower(), "application/octet-stream"
             )
 
-            is_entry = path.name == "index.html"
+            # Every HTML page is an entry point, not just the first one. Hardcoded to
+            # "index.html" when there was only one page; with three, the other two
+            # would have had their asset references served unstamped and their cache
+            # policy set from a version query they never emit. The rule is now "is it
+            # markup", which is what the branch is actually for.
+            is_entry = path.suffix.lower() == ".html"
             # The version lives in the query string, and request_path has
             # already been split off the path, so it is read from self.path.
             requested_version = urlsplit(self.path).query
@@ -2072,9 +2433,48 @@ def create_server(
             self.end_headers()
             if send_body:
                 self.wfile.write(body)
+            self._log_response(status, len(body))
+
+        def _log_response(self, status: int, size: int) -> None:
+            """One line per response: who asked for what, what they got, how long.
+
+            A 5xx is logged at ERROR and everything quieter at INFO, so the file
+            can be read either way — tail it to watch it, or grep ERROR to find
+            what broke.
+            """
+            started = getattr(self, "_request_started", None)
+            took = f"{(time.monotonic() - started) * 1000:.0f}ms" if started else "-"
+            peer = self.client_address[0] if self.client_address else "?"
+            detail = ""
+            if status >= 400:
+                detail = f" :: {getattr(self, '_error_detail', '') or '-'}"
+            line = (
+                f"{self.command} {self.path} -> {status} {took} {size}b "
+                f"from={peer}{detail}"
+            )
+            LOG.log(logging.ERROR if status >= 500 else logging.INFO, line)
+
+        def _fail(self, status: int, message: str, **context: Any) -> None:
+            """Log a failure with its cause, then answer the caller briefly.
+
+            The browser gets `message`. The log gets the reason and a traceback
+            where there is one. Those are different audiences: leaking a
+            traceback to a candidate tells them about our internals and still
+            does not tell us anything.
+            """
+            where = " ".join(f"{k}={v}" for k, v in context.items())
+            self._error_detail = f"{message} {where}".strip()
+            LOG.error(
+                "%s %s -> %d :: %s%s", self.command, self.path, status, message,
+                f" ({where})" if where else "",
+                exc_info=True,
+            )
+            self._write_json(status, {"error": message})
 
         def log_message(self, format: str, *args: Any) -> None:
-            return
+            # BaseHTTPRequestHandler's access log was overridden to `return`, so
+            # every line it would have written was discarded. Route it to ours.
+            LOG.debug("base: " + (format % args))
 
     return ResumeHTTPServer((host, port), ResumeRequestHandler)
 
