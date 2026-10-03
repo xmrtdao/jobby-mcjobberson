@@ -65,6 +65,35 @@ _STATIC_CONTENT_TYPES = {
     ".json": "application/json; charset=utf-8",
     ".pdf": "application/pdf",
     ".txt": "text/plain; charset=utf-8",
+    # The image, manifest and sitemap types were missing, so all three fell through
+    # to application/octet-stream. Every file was on disk and every request returned
+    # 200 with the correct bytes, which is why this hid for so long: nothing errored.
+    #
+    # It matters because of the nosniff header below. Sniffing is exactly what a
+    # browser would do to recover the real type, and nosniff forbids it, so an
+    # octet-stream response is taken at face value:
+    #   - og:image as octet-stream is rejected by every major scraper, so the social
+    #     card renders with no picture. Worse than no tag, because the platform then
+    #     falls back to a screenshot of a blank page.
+    #   - the manifest is only parsed when it is application/manifest+json, so the
+    #     install prompt, theme colour and standalone display all silently drop.
+    #   - the sitemap is still read, but not as the XML it is.
+    #
+    # The rest of the image and font types are here so the next image added does not
+    # reproduce this. Adding a file is two edits in this repository: the name goes in
+    # _STATIC_ASSETS, and if it is a new extension, the type goes here.
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".webp": "image/webp",
+    ".avif": "image/avif",
+    ".gif": "image/gif",
+    ".svg": "image/svg+xml",
+    ".ico": "image/x-icon",
+    ".xml": "application/xml; charset=utf-8",
+    ".webmanifest": "application/manifest+json; charset=utf-8",
+    ".woff2": "font/woff2",
+    ".woff": "font/woff",
 }
 # The two new pages and their scripts/stylesheets.
 #

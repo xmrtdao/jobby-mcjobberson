@@ -18,7 +18,7 @@ nothing errors.
 
 This is the single most likely way to break something here:
 
-- Adding `og/jobby-og.png` without listing it → the social card renders with no
+- Adding `jobby-og.png` without listing it → the social card renders with no
   image, and every scraper reports a blank card with no error anywhere.
 - Adding a favicon without listing it → a blank tab icon.
 - Adding `robots.txt` without listing it → search crawlers get a 404 and treat
@@ -28,6 +28,33 @@ This is the single most likely way to break something here:
 
 The set uses `|` union with `_DASHBOARD_ASSETS`, so it is additive — add the
 filename, do not rewrite the block.
+
+### Names are flat, because subdirectories are refused
+
+`_static_path` returns `None` for any request path containing a slash, so
+`og/jobby-og.png` and `favicon/jobby-favicon-32.png` are unservable no matter
+what the allowlist says — they 404 silently. That guard is deliberate; it is
+what keeps a request from reaching outside `docs/`. **Assets therefore live at
+the top level with a prefix** (`jobby-og.png`, not `og/jobby-og.png`).
+
+### Being allowlisted is not the same as being served correctly
+
+There is a **second** list, `_STATIC_CONTENT_TYPES`, and an extension missing
+from it is served as `application/octet-stream` — a 200, with the right bytes,
+and the wrong type. Because the server also sends `X-Content-Type-Options:
+nosniff`, sniffing is forbidden, so the wrong type is taken at face value:
+
+- `og:image` as octet-stream is rejected by every major scraper, so the share
+  card has no picture — and the platform falls back to a screenshot of a blank
+  page, which looks worse than having no tag at all.
+- A manifest is only parsed as `application/manifest+json`, so an unmapped
+  extension silently removes the install prompt, theme colour and standalone
+  display.
+- Favicons are usually sniffed into place anyway, which is exactly why a broken
+  one goes unnoticed.
+
+**Adding a file is two edits: the name in `_STATIC_ASSETS`, and — if it is an
+extension not already mapped — the type in `_STATIC_CONTENT_TYPES`.**
 
 ---
 
@@ -73,17 +100,26 @@ apart otherwise:
 - `<title>`, `meta[name=description]`, `meta[name=keywords]`
 - `og:title`, `og:description`, `og:image`, `og:image:width/height/alt`, `og:url`
 - `twitter:card`, `twitter:title`, `twitter:description`, `twitter:image`
-- `og/jobby-og.png` (1200×630 PNG)
+- `jobby-og.png` (1200×630 PNG, at the top level — see the flat-names rule above)
 
 **Absolute URLs in OG and Twitter tags.** Relative paths resolve against the
 scraper's own base and produce a broken card.
 
-**`og:image` must resolve publicly.** Verify with an unauthenticated request
-that it returns `200` and `image/png`. Check it against the tunnel, not
-`localhost` — the scraper is not on this machine.
+**`og:image` must resolve publicly, as `image/png`.** Verify with an
+unauthenticated request that it returns `200`, `image/png`, and that the bytes
+really are a PNG. Check it against the tunnel, not `localhost` — the scraper is
+not on this machine.
 
-The image is served through the same allowlist as everything else, so it only
-appears after `_STATIC_ASSETS` lists it.
+Three things have to be true at once, and each one was false on its own at some
+point: the name is in `_STATIC_ASSETS` (or it 404s), `.png` is in
+`_STATIC_CONTENT_TYPES` (or it arrives as octet-stream and the card is blank),
+and the dimensions match the `og:image:width`/`height` tags (or the crop is
+wrong).
+
+**Verify in a browser, not only with `fetch()`.** A terminal request and a
+browser can disagree about the same URL — on 31harbor.com a query-string cache
+bust served `fetch()` the current stylesheet while the browser kept a stale one,
+which looked exactly like a CSS bug. Ask the browser what it actually parsed.
 
 ---
 
@@ -104,7 +140,8 @@ appears after `_STATIC_ASSETS` lists it.
 
 ## Before committing
 
-- **New file served to a browser? It is in `_STATIC_ASSETS`.**
+- **New file served to a browser? It is in `_STATIC_ASSETS`, and a new extension
+  is in `_STATIC_CONTENT_TYPES`.**
 - No credential or token anywhere. `relay/.env` is a different repo and is
   gitignored.
 - `resume_server.log` is not staged.
