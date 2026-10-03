@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Your dashboard - Jobby McJobberson</title>
+<meta name="description" content="See what Jobby has been doing: your plan, your applications, your outreach, and what it needs from you next.">
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="dashboard.css">
+<!-- The floating conversation. Same panel as the front page, same session, same
+     transcript — mounted from one script so the two pages cannot drift apart. The
+     order matters: jobby.js caches the chat's elements on init, so the widget has
+     to have mounted first. Both are `defer`, so document order is execution
+     order. -->
+<link rel="stylesheet" href="chat-widget.css">
+</head>
+<body class="dashboard-page">
+  <header class="site-header">
+    <a class="brand" href="index.html" aria-label="Jobby McJobberson home">
+      <span class="brand-mark">JM</span>
+      <span>
+        <strong>Jobby McJobberson</strong>
+        <small>your dashboard</small>
+      </span>
+    </a>
+    <nav aria-label="Primary navigation">
+      <a href="index.html">Talk to Jobby</a>
+      <a class="is-current" href="dashboard.html" aria-current="page">Dashboard</a>
+      <a href="employers.html">For employers</a>
+      <a class="button button-small" href="index.html#jobby">Open chat</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero hero-dashboard">
+      <div class="hero-inner">
+        <p class="eyebrow">Your dashboard</p>
+        <h1>What Jobby has been doing, and what it needs from you</h1>
+        <p class="hero-lede">
+          Everything here is a record, not a summary. If something is not moving, the
+          reason is written down next to it. If Jobby is waiting on you, that is at the
+          top.
+        </p>
+        <p class="hero-note">
+          The conversation stays on the <a href="index.html">front page</a> — this is
+          where you watch the work.
+        </p>
+      </div>
+    </section>
+
+    <!-- The needs-you list is first and unmissed. A dashboard that leads with
+         "14 applications" and buries the two things blocking them is a dashboard
+         that makes a candidate feel busy rather than helped. -->
+    <section class="section" id="needs-you" aria-label="What needs you">
+      <div class="section-heading">
+        <h2>What needs you</h2>
+        <p id="needs-you-count">Checking…</p>
+      </div>
+      <div id="needs-you-body">
+        <p class="empty-note">Loading…</p>
+      </div>
+    </section>
+
+    <section class="section" id="mission" aria-label="Your mission">
+      <div class="section-heading">
+        <h2>Your mission</h2>
+      </div>
+      <div class="mission-grid" id="mission-body">
+        <p class="empty-note">Loading…</p>
+      </div>
+    </section>
+
+    <section class="section" id="applications" aria-label="Your applications">
+      <div class="section-heading">
+        <h2>Your applications</h2>
+        <p>
+          Each one is a packet built for that specific job. Anything it could not confirm
+          is written on it rather than left out.
+        </p>
+      </div>
+      <div id="applications-body">
+        <p class="empty-note">Loading…</p>
+      </div>
+    </section>
+
+    <section class="section" id="outreach" aria-label="What Jobby sent">
+      <div class="section-heading">
+        <h2>What Jobby has sent</h2>
+        <p>Every message, and what happened to it.</p>
+      </div>
+      <div id="outreach-body">
+        <p class="empty-note">Loading…</p>
+      </div>
+    </section>
+
+    <section class="section" id="activity" aria-label="Recent activity">
+      <div class="section-heading">
+        <h2>Recent activity</h2>
+        <p>The last things Jobby did, newest first.</p>
+      </div>
+      <div id="activity-body">
+        <p class="empty-note">Loading…</p>
+      </div>
+    </section>
+
+    <section class="section" id="dossier-snapshot" aria-label="Your record">
+      <div class="section-heading">
+        <h2>Your record</h2>
+        <p>
+          What Jobby currently has on file. Switch between the five readings on the
+          <a href="index.html#dossier-panel">front page</a>.
+        </p>
+      </div>
+      <div id="dossier-body">
+        <p class="empty-note">Loading…</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>Jobby McJobberson — the professional preparation and orchestration layer.</p>
+    <p><a href="index.html">Talk to Jobby</a> · <a href="dashboard.html">Your dashboard</a> · <a href="employers.html">For employers</a></p>
+  </footer>
+
+  <script src="i18n.js"></script>
+  <!-- The floating conversation: the same panel, the same session and the same
+       transcript as the front page, mounted from one script so the two pages
+       cannot drift apart.
+
+       Order is load-bearing. jobby.js caches the chat's elements once on init and
+       attaches listeners to them, so the widget has to have mounted by then. These
+       are `defer`, which means document order is execution order.
+
+       This is the whole reason the chat became a widget rather than merely moving
+       on the front page: someone who comes here to find out why their application
+       was refused is exactly the person who needs to ask about it, and there was
+       nowhere to ask from. -->
+  <script src="chat-experience.js" defer></script>
+  <script src="jobby-chat-widget.js" defer></script>
+  <script src="jobby.js" defer></script>
+  <script src="dashboard.js" defer></script>
+</body>
+</html>

@@ -24,3 +24,7 @@ _wide.html
 test_resume.pdf
 test_resume.docx
 _commit_msg.txt
+
+server-probe.out
+server-probe.err
+

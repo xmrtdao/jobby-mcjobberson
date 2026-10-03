@@ -23,6 +23,17 @@ try:
     from resume_server import _VERSIONED_ASSETS as _VERSIONED_FOR_STAMP
 except Exception:  # noqa: BLE001 - reported by the checks below
     _VERSIONED_FOR_STAMP = ("app.js", "styles.css", "jobby.js", "hero-scene.js", "i18n.js")
+# What the front page itself carries. The list above is everything the server
+# stamps; this is the subset index.html is expected to reference. Conflating the
+# two is what made this block report the dashboard and employer assets as missing
+# from a page they were never meant to be on.
+_FRONT_PAGE_ASSETS = ("app.js", "styles.css", "jobby.js", "hero-scene.js", "i18n.js",
+                      # The chat became a floating panel shared with the dashboard, so
+                      # the front page now references these two as well. Listed here
+                      # rather than left to the union check below, because the union
+                      # only proves *some* page stamps them — it would pass with the
+                      # front page pointing at an unstamped copy.
+                      "jobby-chat-widget.js", "chat-widget.css")
 
 
 
@@ -63,6 +74,37 @@ try:
     check("styles.css reference found", len(styles) == 1, styles)
     check("app.js has a version", scripts and scripts[0].startswith("app.js?v="), scripts)
     check("styles.css has a version", styles and styles[0].startswith("styles.css?v="), styles)
+
+    # ── the other two entry points, while the server is still up ────────────
+    #
+    # The page-agreement checks further down read these from disk, which is
+    # wrong for the stamp: `?v=` is added by the server on the way out, so a file
+    # on disk never has one and reading it from disk reports every asset as
+    # unstamped. Fetched here instead, which is the only place the stamped bytes
+    # exist. The two new pages 404'd on first serve because the server's asset
+    # allowlist did not name them, and nothing here would have caught that — the
+    # status check is the point.
+    print("\n--- dashboard and employer pages are served and cache-bust ---")
+    _PAGE_ASSETS = {
+        "/dashboard.html": {"dashboard.js", "dashboard.css", "i18n.js"},
+        "/employers.html": {"employer.js", "employer.css", "i18n.js"},
+    }
+    served_pages = {}
+    for _route, _expected in sorted(_PAGE_ASSETS.items()):
+        _status, _headers, _body = get(_route)
+        check("%s served" % _route, _status == 200,
+              "the page is linked from the nav but the server does not serve it — "
+              "is it missing from _STATIC_ASSETS?")
+        if _status != 200:
+            continue
+        served_pages[_route] = _body
+        check("%s is revalidated" % _route, _headers.get("Cache-Control") == "no-cache",
+              _headers.get("Cache-Control"))
+        _stamps = dict(re.findall(r'([\w.-]+\.(?:js|css))\?v=(\d+)', _body))
+        for _asset in sorted(_expected):
+            check("%s stamps %s" % (_route, _asset), _asset in _stamps,
+                  "references %s with no ?v=, so a browser keeps the old file after "
+                  "a change" % _asset)
 
     expected = str(int((ROOT / "app.js").stat().st_mtime))
     check("version matches app.js mtime", scripts and scripts[0] == f"app.js?v={expected}",
@@ -136,11 +178,61 @@ try:
     check("jobby.js defines the panel entry point", "function initJobby" in body)
     check("jobby.js is in the allowlist", "jobby.js" in (ROOT / "index.html").read_text(encoding="utf-8"))
 
+    print("\n--- the conversation is a floating panel, on every candidate page ---")
+    # These ids used to be asserted present in index.html, because that is where
+    # the chat lived. It no longer does — jobby-chat-widget.js builds the subtree at
+    # runtime, so the ids exist in the file that creates them and jobby.js finds
+    # them by getElementById. The invariant is therefore "the ids exist somewhere
+    # the browser will have them before jobby.js runs", not "they are in this
+    # markup", and that is what is checked: the widget builds them, both pages load
+    # the widget, and both load it before jobby.js.
+    widget_js = (ROOT / "jobby-chat-widget.js").read_text(encoding="utf-8")
+    for needed in ("jobby-log", "jobby-form", "jobby-input", "jobby-send", "jobby-hint",
+                   "attach-row", "attach-list", "jobby-attach"):
+        check(f"the widget builds {needed}", f"'{needed}'" in widget_js or f'"{needed}"' in widget_js)
+
+    # jobby.js caches these once and attaches listeners to them, so a widget that
+    # mounts after it produces a chat that renders perfectly and sends nothing.
+    # Document order is execution order for `defer`, so the order of the two tags is
+    # the whole mechanism. This is the check that would have caught a silent,
+    # completely plausible "the chat is broken and I cannot see why".
+    for page in ("index.html", "dashboard.html"):
+        phtml = (ROOT / page).read_text(encoding="utf-8")
+        wi = phtml.find("jobby-chat-widget.js")
+        ji = phtml.find('src="jobby.js')
+        check(f"{page} loads the chat widget", wi != -1, phtml[:200])
+        check(f"{page} loads the widget before jobby.js", wi != -1 and ji != -1 and wi < ji,
+              f"widget at {wi}, jobby.js at {ji}")
+        check(f"{page} loads the chat stylesheet", "chat-widget.css" in phtml)
+        check(f"{page} loads jobby.js", ji != -1)
+
+    # The widget is not on the employers page, and must not be: that is a different
+    # audience with a different session and a different chat. A candidate's
+    # conversation appearing on the page a recruiter is using would put one
+    # person's transcript in front of another.
+    emp_html = (ROOT / "employers.html").read_text(encoding="utf-8")
+    check("employers.html does NOT load the candidate chat", "jobby-chat-widget.js" not in emp_html)
+    check("employers.html keeps its own chat script", "employer.js" in emp_html)
+
+    # Served, not just referenced. A script tag pointing at a file the allowlist
+    # does not name is a 404 that reads as a broken build.
+    for asset in ("jobby-chat-widget.js", "chat-widget.css"):
+        status, headers, body = get(f"/{asset}")
+        check(f"{asset} is served", status == 200, status)
+        check(f"{asset} is not html", "html" not in headers.get("Content-Type", ""),
+              headers.get("Content-Type"))
+
     print("\n--- the agent panel markup is present ---")
-    for needed in ('id="jobby"', 'id="jobby-log"', 'id="jobby-form"', 'id="jobby-input"',
-                   'id="jobby-tracks"', 'id="jobby-plan"', 'id="jobby-edits"',
+    # The side panel and the status block stay on the front page; only the chat
+    # moved. If these are missing the page has been over-trimmed.
+    for needed in ('id="jobby"', 'id="jobby-tracks"', 'id="jobby-plan"', 'id="jobby-edits"',
                    'id="jobby-kill-switch"', 'id="jobby-autonomy"'):
         check(f"markup has {needed}", needed in html)
+    # And the chat's own ids are gone from the markup, because a copy left behind
+    # would be duplicated by the widget at runtime: two forms, two ids, and
+    # getElementById returning whichever the parser saw first.
+    for gone in ('id="jobby-log"', 'id="jobby-form"', 'id="jobby-input"'):
+        check(f"markup no longer hardcodes {gone}", gone not in html)
 finally:
     server.shutdown()
     server.server_close()
@@ -157,20 +249,64 @@ finally:
 #
 # Driven by the server's own list rather than a copy, because that is the shape of
 # the bug: two lists that agree until somebody edits only one of them.
-print("\n--- every versioned asset is stamped ---")
-# The entry point the suite already read above, kept in `html`. Fetching it
-# again here would fail: this runs after server.shutdown(), so the test server is
-# already down.
+print("\n--- the front page stamps its own assets ---")
+# Index only. It is the page this block has always meant, and the other two are
+# checked per-page above while the server is still running.
+#
+# Scoped to the front page's five assets on purpose. Running the full versioned
+# list against index.html alone reported the new pages' assets as missing from
+# it — which is true, and not a fault: dashboard.js is not supposed to be on the
+# front page. The list belongs to the server; which page carries which asset is a
+# per-page question, asked per page above.
 _referenced = set(re.findall(r'(?:src|href)="([^"?]+)(?:\?[^"]*)?"', html))
 # The character class includes the hyphen: hero-scene.js has one, and a class of
 # \w and . cannot match it - which made this assertion report a missing stamp on
 # an asset that is stamped correctly. A check that cries wolf is a check that
 # gets ignored.
 _stamp_of = dict(re.findall(r'([\w.-]+\.(?:js|css))\?v=(\d+)', html))
-for _asset in _VERSIONED_FOR_STAMP:
+for _asset in _FRONT_PAGE_ASSETS:
     check("%s is referenced" % _asset, _asset in _referenced, sorted(_referenced))
     check("%s carries a version stamp" % _asset, _asset in _stamp_of,
           "no ?v= on %s, so a browser will keep serving the old file" % _asset)
+
+# ── the asset list, against the union of what the pages reference ───────────
+#
+# There are now three pages, and this section only ever read index.html. So it
+# reported the new pages' assets as unreferenced and unstamped when the real
+# problem was that it was looking in one file.
+#
+# The failure is the mirror of the one this file already documents — a list that
+# agrees with reality until somebody adds a second copy of the truth. The union
+# of the served pages is the honest source; the per-page stamp checks above are
+# where each page is verified against its own assets.
+print("\n--- every versioned asset appears on the page that uses it ---")
+_all_referenced = set(_referenced)
+for _body in served_pages.values():
+    _all_referenced.update(re.findall(r'(?:src|href)="([^"?]+)(?:\?[^"]*)?"', _body))
+for _asset in _VERSIONED_FOR_STAMP:
+    check("%s is referenced by some page" % _asset, _asset in _all_referenced,
+          sorted(_all_referenced))
+
+# The three pages must link to each other and to the front page. A page
+# reachable from the nav but not linking back is how a product ends up with two
+# disconnected halves nobody notices until a user is stranded on one.
+print("\n--- the three pages are wired to each other ---")
+for _page, _expected_links in sorted({
+    "index.html": {"dashboard.html", "employers.html"},
+    "dashboard.html": {"index.html", "employers.html"},
+    "employers.html": {"index.html", "dashboard.html"},
+}.items()):
+    _path = ROOT / _page
+    check("%s exists" % _page, _path.is_file(), "the page is linked from the nav but not on disk")
+    if not _path.is_file():
+        continue
+    _page_html = _path.read_text(encoding="utf-8")
+    for _target in sorted(_expected_links):
+        check(
+            "%s links to %s" % (_page, _target),
+            'href="%s"' % _target in _page_html,
+            "the nav on this page does not reach %s" % _target,
+        )
 
 print()
 if fails:

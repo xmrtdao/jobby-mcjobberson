@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Post a job - Jobby McJobberson for employers</title>
+<meta name="description" content="Write a job listing with Jobby, post it to the Jobby community, and reach candidates who are actually looking. Free to post.">
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="employer.css">
+</head>
+<body class="employer-page">
+  <header class="site-header">
+    <a class="brand" href="index.html" aria-label="Jobby McJobberson home">
+      <span class="brand-mark">JM</span>
+      <span>
+        <strong>Jobby McJobberson</strong>
+        <small>for employers</small>
+      </span>
+    </a>
+    <nav aria-label="Primary navigation">
+      <!-- Three products, three destinations, named for who they are for. The
+           employer page is reachable from the candidate page and back again,
+           because a person who is hiring and a person who is looking are often
+           the same person on the same day. -->
+      <a href="index.html">For job seekers</a>
+      <a href="dashboard.html">My dashboard</a>
+      <a class="is-current" href="employers.html" aria-current="page">For employers</a>
+      <a class="button button-small" href="#jd-drop-zone">Post a job</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero hero-employer">
+      <div class="hero-inner">
+        <p class="eyebrow">For employers</p>
+        <h1>Write the posting once. Have Jobby check it before anyone reads it.</h1>
+        <p class="hero-lede">
+          Drop in a job description and Jobby reads it the way a candidate will: it
+          finds the title, the place, the pay and every requirement, and it tells you
+          what it could not read. You fix that before it goes on the board, not after
+          someone has applied to a job that was not really what you offered.
+        </p>
+        <p class="hero-note">
+          Posting is free. Jobby does not take a percentage of a hire and does not sell
+          your listing to anyone.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="employer-stats" aria-label="Your postings">
+      <div class="section-heading">
+        <h2>What you have posted</h2>
+      </div>
+      <div class="stat-row" id="employer-stats-row">
+        <!-- Filled from GET /api/employer/session. Rendered server-side of the
+             browser, never from anything the model said. -->
+      </div>
+    </section>
+
+    <section class="section" id="jd-drop-zone" aria-label="Job description ingestion">
+      <div class="section-heading">
+        <p class="eyebrow">Step one</p>
+        <h2>Your job description</h2>
+        <p>
+          Paste it, or drop the file you already have. This is a different drop zone
+          from the one on the job-seeker page on purpose: this one reads a posting, not
+          a CV, and a resume parser asked to find a job title in a job ad produces
+          confidently wrong answers.
+        </p>
+      </div>
+
+      <div class="jd-input-grid">
+        <div class="jd-drop-column">
+          <div class="drop-zone employer-drop-zone" id="jd-drop-area" role="button" tabindex="0"
+               aria-controls="jd-file" aria-describedby="jd-drop-hint">
+            <div class="drop-icon" aria-hidden="true">▤</div>
+            <p class="drop-label"><strong>Drop a job description here</strong></p>
+            <p class="drop-hint" id="jd-drop-hint">PDF, DOCX or TXT — up to 5 MB</p>
+            <input type="file" id="jd-file" accept=".pdf,.docx,.txt" aria-label="Choose a job description">
+          </div>
+          <p class="drop-status" id="jd-status" role="status" aria-live="polite"></p>
+        </div>
+
+        <div class="jd-paste-column">
+          <label class="field-label" for="jd-text">Or paste it</label>
+          <textarea id="jd-text" rows="12" spellcheck="true"
+            placeholder="Instrumentation Technician — Northern Gold Mill&#10;&#10;Location: Yellowknife, NT&#10;&#10;Requirements&#10;- Red Seal Journeyperson Electrician&#10;- Minimum 3 years industrial instrumentation experience&#10;- Must be able to work a 14/14 rotation in camp"></textarea>
+          <p class="field-hint">
+            One requirement per line is what makes them readable as requirements. A
+            paragraph of them is a paragraph, and a candidate cannot tell what they are
+            being asked for.
+          </p>
+          <button type="button" class="button" id="jd-parse">Read it</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="jd-review" aria-label="What Jobby read" hidden>
+      <div class="section-heading">
+        <p class="eyebrow">Step two</p>
+        <h2>What Jobby read, and what it could not</h2>
+        <p>
+          Everything below was read out of the text you gave. Nothing here was inferred.
+          Fix anything wrong and read it again.
+        </p>
+      </div>
+      <div id="jd-review-body"></div>
+    </section>
+
+    <section class="section" id="employer-chat" aria-label="Posting assistant">
+      <div class="section-heading">
+        <p class="eyebrow">Step three</p>
+        <h2>Talk it through</h2>
+        <p>
+          Describe the role in your own words and Jobby will draft it, tell you what is
+          missing, and stop where you tell it to. It will not add a requirement you did
+          not say, and it will not turn "preferred" into "required" to make a posting
+          look tighter.
+        </p>
+      </div>
+
+      <div class="jobby-log" id="employer-log" role="log" aria-live="polite"
+           aria-label="Conversation with the posting assistant">
+        <p class="jobby-empty" id="employer-empty">
+          Tell me the role and who you are hiring for. I will draft the posting, list
+          what is missing, and hold off on publishing until you say so.
+        </p>
+      </div>
+      <form class="jobby-form" id="employer-form">
+        <label class="visually-hidden" for="employer-input">Message the posting assistant</label>
+        <textarea id="employer-input" rows="2"
+          placeholder="We need a warehouse operator for the Edmonton site, nights, forklift ticket an asset..."></textarea>
+        <button type="submit" class="button" id="employer-send">Send</button>
+      </form>
+      <p class="jobby-muted" id="employer-hint"></p>
+    </section>
+
+    <section class="section" id="employer-postings" aria-label="Your postings">
+      <div class="section-heading">
+        <h2>Your postings</h2>
+        <p>Drafts are not on the board. Only a published one is.</p>
+      </div>
+      <div id="employer-postings-body"></div>
+    </section>
+
+    <section class="section" id="public-board" aria-label="Live jobs">
+      <div class="section-heading">
+        <h2>What candidates can see right now</h2>
+        <p>The public board, exactly as a candidate sees it. This is a sample of the product from the other side.</p>
+      </div>
+      <div class="board-filters">
+        <label class="visually-hidden" for="board-q">Search jobs</label>
+        <input type="search" id="board-q" placeholder="Search title or company">
+        <label class="visually-hidden" for="board-ticket">Filter by ticket</label>
+        <select id="board-ticket">
+          <option value="">Any ticket</option>
+          <option value="red_seal">Red Seal</option>
+          <option value="first_aid">First aid</option>
+          <option value="cdl">CDL</option>
+          <option value="forklift">Forklift</option>
+          <option value="safety">Safety training</option>
+        </select>
+        <label class="checkbox">
+          <input type="checkbox" id="board-remote"> Remote only
+        </label>
+      </div>
+      <div id="board-body"></div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>Jobby McJobberson — the professional preparation and orchestration layer.</p>
+    <p><a href="index.html">For job seekers</a> · <a href="dashboard.html">Your dashboard</a> · <a href="employers.html">For employers</a></p>
+  </footer>
+
+  <script src="i18n.js"></script>
+  <script src="employer.js"></script>
+</body>
+</html>

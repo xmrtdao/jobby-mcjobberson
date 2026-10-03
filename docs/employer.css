@@ -1,0 +1,573 @@
+/*
+ * employer.css — the employer page
+ *
+ * Kept out of styles.css because these are a different product's screens. The
+ * candidate page and the employer page share a header and a type scale and
+ * nothing else, and one stylesheet governing both would mean every rule here
+ * scoped around rules there.
+ *
+ * The palette is deliberately the same as the candidate side. An employer
+ * arriving from a candidate's link should not feel they have landed somewhere
+ * else — this is the same company, and the difference in the interface is the
+ * difference in the job, not a rebrand.
+ */
+
+.employer-page .hero-employer {
+  background: linear-gradient(180deg, rgba(127, 127, 127, 0.10), transparent 70%);
+}
+
+.employer-page .hero-note {
+  margin-top: 1rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+/* ── the stats row ─────────────────────────────────────────────────────── */
+
+.stat-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.stat-cell {
+  flex: 1 1 8rem;
+  min-width: 8rem;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(127, 127, 127, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+/* A number first, large. An employer scanning their own dashboard wants the
+   figure before the label, and "15 drafts" reads faster than "Drafts 15". */
+.stat-value {
+  font-size: 1.7rem;
+  font-weight: 650;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.stat-note {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.verify-note {
+  flex: 1 1 100%;
+  margin: 0.25rem 0 0;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--border);
+  border-left: 3px solid #b8860b;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.verify-note strong { color: var(--text); }
+
+/* ── the two-column ingestion area ─────────────────────────────────────── */
+
+.jd-input-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+@media (max-width: 780px) {
+  .jd-input-grid { grid-template-columns: 1fr; }
+}
+
+.jd-drop-column,
+.jd-paste-column {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.employer-drop-zone {
+  min-height: 12rem;
+}
+
+/* A different accent from the resume drop zone, so someone with both pages open
+   in two tabs is never unsure which one they are dragging into. */
+.employer-drop-zone { border-color: rgba(127, 127, 127, 0.5); }
+.employer-drop-zone[data-dragging="true"] { border-color: var(--primary); }
+
+.field-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.field-hint {
+  margin: 0;
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
+#jd-text {
+  width: 100%;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface, rgba(0, 0, 0, 0.15));
+  color: var(--text);
+  font: inherit;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+#jd-text:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+
+/* ── what the parse read ───────────────────────────────────────────────── */
+
+.jd-read,
+.jd-problems,
+.jd-allclear,
+.jd-route {
+  margin-bottom: 1.25rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(127, 127, 127, 0.04);
+}
+
+.jd-subhead {
+  margin: 0 0 0.7rem;
+  font-size: 0.9rem;
+}
+
+.jd-subhead-sm {
+  margin: 1rem 0 0.4rem;
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.jd-fields {
+  display: grid;
+  grid-template-columns: 9rem 1fr;
+  gap: 0.4rem 1rem;
+  margin: 0 0 0.5rem;
+  font-size: 0.82rem;
+}
+
+.jd-fields dt {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  padding-top: 0.1rem;
+}
+
+.jd-fields dd { margin: 0; }
+
+/* "not stated" is styled as a first-class answer, not as an empty cell. A blank
+   next to a label reads as a rendering fault; a labelled "not stated" reads as
+   an answer, which is what it is. */
+.jd-value-missing {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.jd-value-note {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.72rem;
+  color: #b8860b;
+}
+
+.jd-req-list,
+.jd-ticket-list,
+.jd-problem-list {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.jd-req {
+  display: flex;
+  gap: 0.55rem;
+  align-items: baseline;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+/* The strength is a colour AND a word. Colour alone is invisible to a
+   colourblind employer and to a screen reader, and "required" versus
+   "preferred" is the distinction that decides who applies. */
+.jd-req-strength {
+  flex: 0 0 5.6rem;
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 700;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  text-align: center;
+  border: 1px solid currentColor;
+}
+
+.jd-req-required .jd-req-strength { color: #b03030; }
+.jd-req-preferred .jd-req-strength { color: #2f6f3f; }
+.jd-req-experience .jd-req-strength { color: #2f5f8f; }
+.jd-req-unstated .jd-req-strength { color: var(--text-muted); }
+
+.jd-req-text { flex: 1; }
+
+.jd-ticket {
+  font-size: 0.76rem;
+  padding: 0.2rem 0.45rem;
+  border-radius: 5px;
+  display: inline-block;
+  margin-right: 0.35rem;
+  border: 1px solid;
+}
+
+.jd-ticket-required { border-color: #b03030; color: #b03030; }
+.jd-ticket-preferred { border-color: #2f6f3f; color: #2f6f3f; }
+/* Unstated is the one that needs shouting about: a candidate cannot tell whether
+   to rule themselves out, so the posting is the thing at fault. */
+.jd-ticket-unstated { border-color: #b8860b; color: #b8860b; }
+
+/* ── the problems ──────────────────────────────────────────────────────── */
+
+.jd-problems {
+  border-left: 3px solid #b03030;
+}
+
+.jd-problem-list { margin: 0; }
+
+.jd-problem {
+  padding: 0.35rem 0 0.35rem 0.85rem;
+  border-left: 2px solid rgba(176, 48, 48, 0.4);
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+
+.jd-problem-note {
+  margin: 0.7rem 0 0;
+  font-size: 0.74rem;
+  color: var(--text-muted);
+}
+
+.jd-allclear { border-left: 3px solid #2f6f3f; }
+.jd-allclear p { margin: 0; font-size: 0.8rem; color: var(--text-muted); }
+
+/* ── the apply route ───────────────────────────────────────────────────── */
+
+.jd-route-row {
+  display: grid;
+  grid-template-columns: 9rem 1fr;
+  gap: 0.5rem 1rem;
+  align-items: center;
+  margin-bottom: 0.7rem;
+}
+
+.jd-route-row input {
+  width: 100%;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface, rgba(0, 0, 0, 0.15));
+  color: var(--text);
+  font: inherit;
+  font-size: 0.8rem;
+}
+
+/* ── the postings list ─────────────────────────────────────────────────── */
+
+.posting-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.posting-card {
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(127, 127, 127, 0.04);
+}
+
+.posting-card[data-focus="true"] {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px var(--primary);
+}
+
+.posting-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  margin-bottom: 0.3rem;
+}
+
+.posting-title {
+  margin: 0;
+  font-size: 0.95rem;
+  flex: 1;
+}
+
+.posting-badge {
+  font-size: 0.64rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  border: 1px solid currentColor;
+}
+
+.posting-badge-published { color: #2f6f3f; }
+.posting-badge-draft { color: var(--text-muted); }
+.posting-badge-closed { color: #b03030; }
+
+.posting-meta,
+.posting-reach {
+  margin: 0 0 0.3rem;
+  font-size: 0.76rem;
+  color: var(--text-muted);
+}
+
+.posting-notes {
+  list-style: none;
+  margin: 0.5rem 0;
+  padding: 0;
+  font-size: 0.76rem;
+  color: var(--text-muted);
+}
+
+.posting-notes li {
+  padding: 0.15rem 0 0.15rem 0.7rem;
+  border-left: 2px solid rgba(176, 48, 48, 0.35);
+  line-height: 1.5;
+}
+
+.posting-notes-more { border-left-color: transparent !important; font-style: italic; }
+
+.posting-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+
+/* ── the public board ──────────────────────────────────────────────────── */
+
+.board-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+  margin-bottom: 0.9rem;
+}
+
+.board-filters input[type="search"],
+.board-filters select {
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface, rgba(0, 0, 0, 0.15));
+  color: var(--text);
+  font: inherit;
+  font-size: 0.8rem;
+}
+
+.board-filters input[type="search"] { min-width: 14rem; }
+
+.checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.board-count {
+  margin: 0 0 0.6rem;
+  font-size: 0.74rem;
+  color: var(--text-muted);
+}
+
+.board-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  gap: 0.75rem;
+}
+
+.board-card {
+  padding: 0.85rem 0.95rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(127, 127, 127, 0.04);
+}
+
+.board-title {
+  margin: 0 0 0.25rem;
+  font-size: 0.88rem;
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.board-unverified {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #b8860b;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  padding: 0.05rem 0.3rem;
+  font-weight: 700;
+}
+
+.board-meta,
+.board-pay {
+  margin: 0 0 0.2rem;
+  font-size: 0.74rem;
+  color: var(--text-muted);
+}
+
+.board-pay-missing { font-style: italic; }
+
+.board-tickets {
+  list-style: none;
+  margin: 0.4rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.board-tickets li {
+  font-size: 0.66rem;
+  padding: 0.1rem 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-muted);
+}
+
+/* ── the conversation ──────────────────────────────────────────────────── */
+
+.chat-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-bottom: 0.7rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.chat-row-you {
+  background: rgba(127, 127, 127, 0.08);
+  margin-left: 12%;
+}
+
+.chat-row-jobby {
+  background: rgba(127, 127, 127, 0.03);
+  margin-right: 12%;
+}
+
+.chat-who {
+  font-size: 0.64rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.chat-text {
+  font-size: 0.84rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.chat-extra {
+  margin: 0.25rem 0 0;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+/* The Send button was rendering as a thin clipped sliver at the right edge.
+   The textarea's intrinsic width is long enough to push a flex item past the
+   container unless it is allowed to shrink, and `flex: 1` alone does not do that
+   — min-width defaults to auto, so the button gets whatever is left, which was
+   nothing. min-width: 0 on the growable child is the whole fix. */
+.jobby-form {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-end;
+  margin-top: 0.7rem;
+  flex-wrap: wrap;
+}
+
+.jobby-form textarea {
+  flex: 1 1 18rem;
+  min-width: 0;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface, rgba(0, 0, 0, 0.15));
+  color: var(--text);
+  font: inherit;
+  font-size: 0.84rem;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.jobby-form button {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.jobby-form textarea:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+
+/* ── shared ────────────────────────────────────────────────────────────── */
+
+.empty-note {
+  margin: 0.4rem 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.empty-block {
+  padding: 1rem;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+}
+
+.empty-block p:first-child { margin-top: 0; }
+.empty-block p:last-child { margin-bottom: 0; }
+
+.nav-link-current,
+nav a.is-current {
+  color: var(--text);
+  font-weight: 600;
+}

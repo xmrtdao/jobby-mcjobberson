@@ -1,3 +1,13 @@
+/* The hidden attribute has to win.
+   The UA stylesheet sets [hidden] { display: none }, but ANY author rule that
+   sets display beats it - so .jobby-verify-verified { display: flex } and
+   .jobby-verify-form { display: flex } silently un-hid both blocks, and the
+   panel rendered its confirmed state, its request form and its code entry all
+   at once. The accessibility tree reported nothing wrong: all three were
+   genuinely visible, which is precisely why this was only findable by looking
+   at the pixels. */
+[hidden] { display: none !important; }
+
 :root {
   --primary: #2563eb;
   --primary-hover: #1d4ed8;
@@ -8,6 +18,34 @@
   --white: #ffffff;
   --accent: #dbeafe;
   --success: #22c55e;
+
+  /* Anchor scrolling, declared on the scrolling element.
+   *
+   * Both of these were on `body`, where neither belongs. `scroll-behavior` and
+   * `scroll-padding-top` apply to the element that actually scrolls, which is the
+   * root here — so on `body` they were inert, and `getComputedStyle(html)`
+   * reported `auto` for both while the stylesheet appeared to set them.
+   *
+   * --header-h is the height of .site-header, which is `position: sticky`.
+   *
+   * Sticky headers stay in the flow and float above whatever scrolls past them,
+   * so an anchor jump aligns its target flush with the top of the viewport — and
+   * the nav then covers the first 59px of it. Measured, not guessed: Home landed at
+   * scrollY 59 instead of 0, and Jobs and How it works both put their heading
+   * underneath the bar. Nothing was clipped by overflow; the targets were simply
+   * scrolled to the wrong place.
+   *
+   * scroll-padding-top offsets where the scroll *stops* without moving anything in
+   * the layout, so the sticky header behaves exactly as it does now and Home
+   * resolves to a true scroll-to-zero (59px of padding against a 59px offset).
+   *
+   * One rule covers every anchor in the page, including any added later.
+   *
+   * If the header's padding or content height changes, this has to change with it
+   * — a stale value here is the same bug in a smaller dose. */
+  --header-h: 59px;
+  scroll-behavior: smooth;
+  scroll-padding-top: var(--header-h);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -17,9 +55,27 @@ body {
   background-color: var(--bg);
   color: var(--text);
   line-height: 1.5;
-  scroll-behavior: smooth;
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden; /* Prevent horizontal scroll on body */
+
+  /* The height of .site-header, which is `position: sticky`.
+   *
+   * Sticky headers stay in the flow and float above whatever scrolls past them,
+   * so an anchor jump aligns its target flush with the top of the viewport — and
+   * the nav then covers the first 59px of it. Measured, not guessed: Home landed at
+   * scrollY 59 instead of 0, and Jobs and How it works both put their heading
+   * underneath the bar. Nothing was clipped by overflow; the targets were simply
+   * scrolled to the wrong place.
+   *
+   * `scroll-padding-top` on the scrolling element is the fix rather than a margin
+   * on the sections: it offsets where the scroll *stops* without moving anything
+   * in the layout, so the sticky header behaves exactly as it does now and Home
+   * resolves to a true scroll-to-zero (59px of padding against a 59px offset).
+   *
+   * One rule covers every anchor in the page, including any added later.
+   *
+   * If the header's padding or content height changes, this has to change with it
+   * — a stale value here is the same bug in a smaller dose. */
 }
 
 /* Language toggle. Styled as a nav control rather than a button so it does not
@@ -411,12 +467,31 @@ nav a:hover { color: var(--primary); }
 @media (min-width: 900px) {
   .hero { padding: 3rem 2rem 3.5rem; }
   /* Copy and drop zone share the row. The copy takes a little under half so a
-   * line of the h1 never runs the full measure of the page. */
+   * line of the h1 never runs the full measure of the page.
+   *
+   * The zone itself gets a full-width row of its own beneath the copy. In a plain
+   * flex row it was a sibling column sitting in roughly the right-hand third of a
+   * wide screen — and because the parsed profile and its download actions live
+   * inside that zone, the candidate's CV looked crammed into a narrow column
+   * beside the headline. `flex-wrap` with a 100% basis moves it to its own line
+   * at full width, which is how it already behaved on narrow screens. The dossier
+   * panel below the hero is already `width: 100%` and is untouched by this. */
   .hero-inner {
     flex-direction: row;
     align-items: flex-start;
     text-align: left;
     gap: 3.5rem;
+    flex-wrap: wrap;
+  }
+  .hero-inner > #resume-drop-zone {
+    flex: 1 0 100%;
+  }
+  /* The dossier panel is nested inside .hero-inner as well, which is why the
+     candidate's CV rendered inside the header beside the headline. Same treatment:
+     its own full-width row. Still inside <section class="hero">, so moving it out
+     of the hero entirely is a markup change - see index.html. */
+  .hero-inner > #dossier-panel {
+    flex: 1 0 100%;
   }
   /* Grows a little past its basis to absorb the padding it now carries, so the
    * two columns stay visually even rather than the copy looking narrow. */
@@ -1149,18 +1224,168 @@ nav a:hover { color: var(--primary); }
   text-align: left;
 }
 
-.dossier-job {
+/* ── the dossier record card ──────────────────────────────────────────────── */
+
+/* One card treatment, shared by every record in the dossier.
+ *
+ * This shell used to belong to employment alone. Education, achievements and the
+ * two honesty sections below it were plain `<ul>` lists at 0.8rem in muted grey,
+ * so the visual language stopped dead at the "Experience" subhead: the first part
+ * of a candidate's history read as designed, and the rest read as debug output.
+ * The information was identical in both — only the wrapper differed.
+ *
+ * `.dossier-entry` is the shared name. `.dossier-job` is kept as an alias so
+ * employment markup is unchanged, and so nothing that styles jobs by name breaks.
+ *
+ * The shadow is on all of them, including the jobs that already read as having
+ * one, so the card is a recognisable shape rather than employment having a
+ * privilege the rest of the page does not. */
+.dossier-job,
+.dossier-entry {
   padding: 0.9rem 1rem;
   border: 1px solid var(--border);
   border-left: 3px solid var(--primary);
   border-radius: 12px;
   background: var(--white);
+  box-shadow: 0 10px 22px -16px rgba(15, 23, 42, 0.5);
 }
 
-.dossier-job h3 {
+.dossier-job h3,
+.dossier-entry h3 {
   margin: 0;
   color: var(--primary);
   font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+/* The headline is the fact; the supporting line below it is context. Both are
+   printed from the record — neither is filled in when the source is silent. */
+.dossier-entry .dossier-muted {
+  margin: 0.25rem 0 0;
+}
+
+/* The two sections that report what could NOT be established.
+ *
+ * They are cards like everything else, but their accent is changed rather than
+ * their structure: a gap in a resume is not a failure, and it must not be drawn
+ * in the same blue as a job the candidate definitely held. Amber reads as
+ * "unverified", grey as "silent in the source" — which is the actual difference
+ * between the two. */
+.dossier-entry.is-flag {
+  border-left-color: #b45309;
+}
+
+.dossier-entry.is-flag h3 {
+  color: #92400e;
+}
+
+.dossier-entry.is-gap {
+  border-left-color: var(--border);
+  background: #fbfaf7;
+}
+
+.dossier-entry.is-gap h3 {
+  color: var(--text-muted);
+}
+
+/* ── confirmed achievements ──────────────────────────────────────────────── */
+
+/* Medals, not tiles.
+ *
+ * Each achievement is one sentence the resume actually supports, so the job here
+ * is to make it look like evidence without inflating it into a panel. The row is
+ * a medal and a line of prose; the prose keeps the dossier's body size and leading
+ * rather than being promoted to a heading, because a heading per achievement would
+ * imply fifteen separate claims of equal weight when they are a list of things
+ * worth mentioning.
+ *
+ * The medal is drawn rather than an image: it has to survive a missing asset, and
+ * an <img> with an alt of "" is a worse way to draw a circle than a span is. */
+
+.ach-list {
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ach-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  padding: 0.4rem 0;
+}
+
+/* A hairline between rows, not a border around each. The list reads as one block
+   of achievements; the rule gives the eye a line to follow without repeating a box
+   fifteen times. */
+.ach-row + .ach-row {
+  border-top: 1px solid var(--border);
+}
+
+/* The medal: a gold disc with two ribbon tails behind it.
+ *
+ * Positioned rather than laid out, because the tails have to tuck behind the disc
+ * and a flex child cannot. The disc is the parent and the tails are its
+ * ::before and ::after, so they overlap it in the right order with no z-index
+ * juggling and no extra elements in the DOM. */
+.ach-medal {
+  position: relative;
+  flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
+  margin-top: 2px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #f7d774 0%, #d4a017 45%, #a97406 100%);
+  /* A rim rather than a drop shadow: a medal is a struck object, and the highlight
+     along the top edge is what makes it read as metal instead of a flat dot. */
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75), inset 0 -1px 2px rgba(0, 0, 0, 0.28);
+}
+
+/* The ribbon tails. Angled outward and clipped to a notch, which is what makes the
+   shape read as fabric rather than as two extra bars. */
+.ach-medal::before,
+.ach-medal::after {
+  content: '';
+  position: absolute;
+  top: 11px;
+  width: 6px;
+  height: 12px;
+  background: #b3392f;
+  /* A notch cut out of the bottom edge. */
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 72%, 0 100%);
+}
+
+.ach-medal::before {
+  left: 1px;
+  transform: rotate(11deg);
+  background: linear-gradient(180deg, #c4453a, #8f2a22);
+}
+
+.ach-medal::after {
+  right: 1px;
+  transform: rotate(-11deg);
+  background: linear-gradient(180deg, #c4453a, #8f2a22);
+}
+
+/* The sentence. Sits at body size and normal weight — this is the candidate's
+   claim, not a section title — with the leading opened up so consecutive
+   achievements do not crowd. */
+.ach-text {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+
+/* ── the two honesty sections keep the card, with a changed accent ───────── */
+
+/* A card holding a single confirmed achievement is the most repeated object on
+   the page, so it sits tighter than an employment card with bullets under it. */
+.dossier-entry.is-compact {
+  padding: 0.6rem 0.85rem;
+  font-size: 0.82rem;
+  line-height: 1.5;
 }
 
 #dossier-body > .dossier-list { margin-top: 0; }
@@ -1390,6 +1615,58 @@ nav a:hover { color: var(--primary); }
 .jobby-track.is-active .jobby-track-dot { background: var(--primary); }
 .jobby-track:not(.is-active) { opacity: 0.55; }
 
+/* Track 5's third state: closed, but the resume suggests it would fit. It is
+ * deliberately NOT dimmed like a closed track — dimming it would say "nothing
+ * here for you", which is the opposite of what the relay decided. It gets a
+ * dashed outline and full opacity so it reads as an option, not a rejection. */
+.jobby-track.is-offered {
+  opacity: 1;
+  border: 1px dashed var(--primary);
+  border-radius: 8px;
+  padding: 0.5rem 0.6rem;
+}
+
+.jobby-track.is-offered .jobby-track-dot {
+  background: transparent;
+  border: 2px solid var(--primary);
+}
+
+.jobby-track.is-offered .jobby-track-state { color: var(--primary); font-weight: 600; }
+
+/* The reason the relay decided each track's state, and the honest caveats that
+ * came with the roster. Read as an aside, not as a headline. */
+.jobby-track-reason {
+  margin: 0.2rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  line-height: 1.55;
+}
+
+/* The FIFO explainer under the marketing track table. Sits inside .tracks, so
+ * it inherits that section's rhythm but is set as a note rather than a row. */
+.track-note {
+  margin-top: 1.4rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--primary);
+  border-radius: 8px;
+  background: var(--surface, transparent);
+}
+
+.track-note h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+}
+
+.track-note p {
+  margin: 0 0 0.6rem;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  line-height: 1.65;
+}
+
+.track-note p:last-child { margin-bottom: 0; }
+
 .jobby-track-name,
 .jobby-action-title,
 .jobby-edit-path {
@@ -1494,3 +1771,448 @@ nav a:hover { color: var(--primary); }
   overflow-wrap: anywhere;
 }
 
+/* ── Email verification ──────────────────────────────────────────────────
+   Sits inside the status bar, under the controls. Deliberately not a modal and
+   not a separate page: it is a small persistent fact about the session, and the
+   candidate should be able to see it and carry on reading the conversation.
+
+   Mobile-first, like everything else here. The form is a column until there is
+   room for the input and the button to sit side by side, because a 6-digit code
+   box and a button fighting for one 320px line is where this kind of flow dies. */
+.jobby-verify {
+  margin: 0.75rem 0.75rem 0;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+}
+.jobby-verify-lead {
+  margin: 0 0 0.6rem;
+  color: var(--text);
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+.jobby-verify-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin: 0;
+}
+.jobby-verify-label {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.jobby-verify input[type=email],
+.jobby-verify input[type=text] {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--text);
+  background: var(--bg);
+}
+.jobby-verify input:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+/* Tabular figures so six digits do not shuffle sideways as they are typed. */
+.jobby-verify input[type=text] {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.35em;
+  text-align: center;
+}
+.jobby-verify button {
+  padding: 0.55rem 0.9rem;
+  border: 0;
+  border-radius: 8px;
+  background: var(--primary);
+  color: #fff;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.jobby-verify button:hover:not(:disabled) { background: var(--primary-hover); }
+.jobby-verify button:disabled { opacity: 0.6; cursor: progress; }
+.jobby-verify .jobby-hint { padding: 0.5rem 0 0; }
+.jobby-verify .jobby-hint[data-kind=ok] { color: #15803d; }
+.jobby-verify .jobby-hint[data-kind=error] { color: #b91c1c; }
+
+.jobby-verify-verified {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: #15803d;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.jobby-verify-tick {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 50%;
+  background: #dcfce7;
+  color: #15803d;
+  font-size: 0.72rem;
+}
+
+@media (min-width: 30rem) {
+  .jobby-verify-form { flex-direction: row; align-items: center; flex-wrap: wrap; }
+  .jobby-verify-form input { flex: 1 1 12rem; width: auto; }
+  .jobby-verify-form button { flex: 0 0 auto; }
+  .jobby-verify-label { flex: 1 0 100%; }
+}
+
+/* Dossier view switcher.
+   The tabs are the interaction, so they are a real tablist with selection state
+   rather than a row of buttons. `.dv-count` sits on the tab so a view with more
+   to show is obvious before clicking it. */
+.dossier-views {
+  margin: 0 0 1.4rem;
+  padding: 1rem 1.1rem 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface, transparent);
+}
+
+.dv-head .eyebrow { margin: 0 0 0.2rem; }
+.dv-note {
+  margin: 0 0 0.8rem;
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  line-height: 1.55;
+}
+
+.dv-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.9rem;
+}
+
+.dv-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.dv-tab:hover { border-color: var(--primary); }
+
+.dv-tab.is-active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+/* A view with nothing in it is still offered — that is information — but it is
+   never styled as if it were fully populated. */
+.dv-tab.is-empty .dv-count { color: var(--text-muted); font-weight: 400; }
+
+.dv-count {
+  font-size: 0.68rem;
+  font-weight: 700;
+  opacity: 0.75;
+}
+
+.dv-viewhead { margin-bottom: 0.8rem; }
+.dv-viewlabel { margin: 0 0 0.15rem; font-size: 0.95rem; font-weight: 700; }
+.dv-blurb,
+.dv-audience {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  line-height: 1.55;
+}
+.dv-audience { margin-top: 0.15rem; font-style: italic; }
+
+.dv-section {
+  margin-bottom: 0.75rem;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+/* The sections a recruiter actually reads first get a marked edge. */
+.dv-section.is-lead { border-left: 3px solid var(--primary); }
+
+.dv-section h4 {
+  margin: 0 0 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+/* Our reading of a service record, beside the record itself. Deliberately
+   quieter than the original wording, and never replacing it. */
+.dv-also {
+  margin-top: 0.5rem;
+  padding: 0.45rem 0.55rem;
+  border-radius: 6px;
+  background: rgba(127, 127, 127, 0.08);
+}
+.dv-also-label {
+  margin: 0 0 0.25rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+.dv-also-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.dv-also-reason {
+  margin: 0.35rem 0 0;
+  font-size: 0.68rem;
+  font-style: italic;
+  color: var(--text-muted);
+}
+
+/* Rendered, never hidden. A view that quietly omitted its own gaps would read
+   as complete, which is the failure the whole feature exists to prevent. */
+.dv-gaps {
+  margin-top: 0.7rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+}
+.dv-gaps-label {
+  margin: 0 0 0.3rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.dv-footnote {
+  margin: 0.8rem 0 0;
+  font-size: 0.7rem;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+
+/* Provenance line on a derived section: where the content was read from.
+   Quiet on purpose — it is an aside, not a claim. */
+.dv-derived {
+  margin: 0.35rem 0 0;
+  font-size: 0.68rem;
+  font-style: italic;
+  color: var(--text-muted);
+}
+
+/* The no-resume invitation. Sits in the section heading because the offer is to
+   skip the upload box ABOVE it, so the two have to be read together. */
+.jobby-noresume {
+  max-width: 46rem;
+  margin: 0.9rem 0 0;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--primary);
+  border-radius: 8px;
+  background: rgba(127, 127, 127, 0.06);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
+
+.jobby-noresume strong { color: var(--text); }
+
+/* ── the compose bar ─────────────────────────────────────────────────────
+   One row: attach, type, send. The textarea used to sit beside the button
+   with no room to grow, so a long question was typed into a two-line box
+   that scrolled. min-width: 0 on the growing child is what makes the
+   button stop being squeezed off the edge. */
+
+.compose-bar {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-end;
+  margin-top: 0.5rem;
+}
+
+.compose-bar textarea {
+  flex: 1 1 12rem;
+  min-width: 0;
+  resize: none;
+  overflow-y: hidden;
+  line-height: 1.5;
+}
+
+.compose-bar button[type="submit"] {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/* ── attachments ────────────────────────────────────────────────────────
+   Staged on the message rather than sent with it, so a file can be added
+   and still taken back before anything leaves the browser. */
+
+.attach-row {
+  margin-top: 0.5rem;
+}
+
+.attach-row[data-dragging="true"] {
+  outline: 2px dashed var(--primary);
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+
+.attach-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.attach-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.4rem 0.25rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(127, 127, 127, 0.08);
+  font-size: 0.74rem;
+  max-width: 100%;
+}
+
+.attach-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 14rem;
+}
+
+.attach-size {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  flex: 0 0 auto;
+}
+
+.attach-remove {
+  flex: 0 0 auto;
+  width: 1.3rem;
+  height: 1.3rem;
+  line-height: 1;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.attach-remove:hover { background: rgba(127, 127, 127, 0.18); color: var(--text); }
+.attach-remove:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+
+.attach-button {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  height: 2.4rem;
+  padding: 0 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  cursor: pointer;
+}
+
+.attach-button:hover { color: var(--text); border-color: var(--primary); }
+
+.attach-glyph {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+/* The file input is driven by its label, so it is not a second control. */
+#jobby-attach {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+#jobby-attach:focus-visible + .compose-bar textarea,
+.attach-button:focus-within { outline: 2px solid var(--primary); outline-offset: 1px; }
+
+/* ── voice ──────────────────────────────────────────────────────────────
+   Off until pressed, because a browser will not start audio without a
+   gesture and a button that looks on but is not produces silence and a
+   support ticket. */
+
+.voice-button {
+  flex: 0 0 auto;
+  width: 2.4rem;
+  height: 2.4rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.voice-button.is-on {
+  color: var(--text);
+  border-color: var(--primary);
+  background: rgba(127, 127, 127, 0.12);
+}
+
+/* Asked for it before, but the browser still needs this session's click. */
+.voice-button.is-wanted:not(.is-on) {
+  border-style: dashed;
+  border-color: var(--primary);
+}
+
+.voice-button:disabled { opacity: 0.4; cursor: not-allowed; }
+.voice-button:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+
+/* ── notes in the transcript ────────────────────────────────────────────
+   Attachment progress and merge conflicts. A third role, not a Jobby
+   message: putting them in Jobby's voice would be a lie about who said
+   them, and a candidate who cannot tell a system notice from an answer
+   stops reading both. */
+
+.jobby-msg-note {
+  border-left: 3px solid var(--border);
+  padding-left: 0.6rem;
+}
+
+.jobby-msg-note .jobby-who { font-style: italic; }
+
+.jobby-msg-working { border-left-color: #2f5f8f; }
+.jobby-msg-success { border-left-color: #2f6f3f; }
+.jobby-msg-error { border-left-color: #b03030; }
+.jobby-msg-error .jobby-text { color: #b03030; }

@@ -126,7 +126,7 @@
 
     // --- tracks
     'Multi-Track Strategy': 'Estrategia multirruta',
-    'Four tracks. One control plane.': 'Cuatro rutas. Un solo panel de control.',
+    'Five tracks. One control plane.': 'Cinco rutas. Un solo panel de control.',
     'Track': 'Ruta',
     'Purpose': 'Objetivo',
     'Current status': 'Estado actual',
@@ -184,6 +184,55 @@
     'Identity': 'Identidad',
     'Summary': 'Resumen',
     'Experience': 'Experiencia',
+    // Added with the navigation, the dashboard headings and the floating chat.
+    // Untranslated copy on a page with a language toggle is not a cosmetic miss:
+    // it is a Spanish speaker clicking ES and still reading English.
+    'Dashboard': 'Panel',
+    'Employers': 'Empresas',
+    'How you are being shown': 'Cómo se te está mostrando',
+    'Email confirmed': 'Correo confirmado',
+    'Do not have a resume?': '¿No tienes currículum?',
+    'That is not a problem, and it is the more common starting point than it should be. Skip the upload box above and just start talking — tell Jobby what you did, what you are good at, what you want next. It writes it down as you go, tells you what is still missing rather than guessing at it, and builds the resume from your own words.': 'No es un problema, y es el punto de partida más común de lo que debería. Sáltate el cuadro de subida de arriba y empieza a hablar: cuéntale a Jobby lo que hiciste, lo que se te da bien, lo que quieres ahora. Lo va dejando por escrito según hablas, te dice lo que aúl falta en lugar de suponerlo, y construye el currículum con tus propias palabras.',
+    'The conversation is in the corner of every page.': 'La conversación está en la esquina de cada página.',
+    'It was a section here until it became clear that asking a question meant scrolling to find it and then navigating back to read the answer. Open the Jobby button at the bottom of the screen and it stays with you — on your dashboard, on this page, wherever you go.': 'Era una sección de esta página hasta que quedó claro que hacer una pregunta obligaba a desplazarse hasta encontrarla y luego volver para leer la respuesta. Abre el botón de Jobby al pie de la pantalla y te acompaña: en tu panel, en esta página, dondequiera que vayas.',
+    // The verification panel, from the claim work. The send gate depends on
+    // this panel being reachable, so its wording is load-bearing rather than
+    // decorative.
+    'Confirm your email and Jobby can apply to jobs on your behalf. It sends six digits to that inbox and you give them back here.': 'Confirma tu correo y Jobby podrá presentar solicitudes por ti. Manda seis dígitos a ese buzón y tú me los devuelves aquí.',
+    'Your email address': 'Tu dirección de correo',
+    'Send me a code': 'Mándame un código',
+    'The six digits': 'Los seis dígitos',
+    'Confirm': 'Confirmar',
+    // The dossier panel, introduced with the five views. Describes only how the
+    // product behaves, so it carries no claim that a mistranslation could falsify.
+    'Every version of you': 'Todas tus versiones',
+    'One dossier, read differently for every kind of work. A career that looks thin to a site recruiter and strong to an editor is not two careers — it is one, and the view is what changes. Nothing is invented to fill a gap; if a view has nothing to show, it says so.': 'Un solo expediente, leído de otra forma para cada tipo de trabajo. Una carrera que le parece floja a un reclutador de mina y sólida a un redactor no son dos carreras: es una, y lo que cambia es la lectura. No se inventa nada para rellenar un hueco; si una lectura no tiene nada que mostrar, lo dice.',
+    // The jobs list. Added with the section, not after the coverage test
+    // complained about it for the third time.
+    'Home': 'Inicio',
+    'Jobs': 'Empleos',
+    'How it works': 'Cómo funciona',
+    'Live from public feeds': 'En vivo desde fuentes públicas',
+    'The jobs it is reading right now.': 'Los empleos que está leyendo ahora mismo.',
+    'Every one of these came off a public job feed in the last few days, and every one is here with the feed it came from attached. Jobby has not read or checked any of them.': 'Todos estos salieron de una fuente de empleos pública en los últimos días, y cada uno viene con la fuente de la que salió. Jobby no ha leído ni verificado ninguno.',
+    'Search jobs': 'Buscar empleos',
+    'Search roles or employers': 'Busca puestos o empresas',
+    'Filter by source': 'Filtrar por fuente',
+    'Every source': 'Todas las fuentes',
+    'Loading…': 'Cargando…',
+    'Loading the board…': 'Cargando el tablón…',
+    'Where these come from, and what each source is good for': 'De dónde vienen y para qué sirve cada fuente',
+    'What each source contributed': 'Lo que aportó cada fuente',
+    'Source': 'Fuente',
+    'Employer stated': 'Empleador declarado',
+    'From the title': 'Del título',
+    'No employer': 'Sin empleador',
+    'Location stated': 'Ubicación declarada',
+    'Known problems with the board': 'Problemas conocidos del tablón',
+    'Employer not stated': 'Empleador no declarado',
+    'Location not stated': 'Ubicación no declarada',
+    'No jobs on the board yet. The feeds are polled on a schedule; check back shortly.': 'Aún no hay empleos en el tablón. Las fuentes se consultan según un horario; vuelve pronto.',
+    'Nothing on the board matches that. Try a broader word, or every source.': 'Nada en el tablón coincide. Prueba con algo más general o con todas las fuentes.',
     'Education': 'Formación',
     'Certifications': 'Certificaciones',
     'Extraction confidence': 'Confianza de la extracción',
@@ -223,6 +272,18 @@
     // rather than a format table.
     '{n} of {total} tracks active': '{n} de {total} rutas activas',
     'No tracks active': 'Ninguna ruta activa',
+    'Do not have a resume? That is not a problem, and it is the more common starting point than it should be. Skip the upload box above and just start talking — tell Jobby what you did, what you are good at, what you want next. It writes it down as you go, tells you what is still missing rather than guessing at it, and builds the resume from your own words.': '¿No tienes currículum? Eso no es un problema, y es el punto de partida más habitual de lo que debería ser. Sáltate el apartado de subir el currículum de arriba y empieza a hablar: cuéntale a Jobby lo que hiciste, en qué eres bueno y qué quieres hacer ahora. Lo irá anotando, te dirá lo que falta en lugar de suponerlo, y construirá el currículum con tus propias palabras.',
+    'No resume? Good — start here. Tell me what you have done and I will write it down as we go, then turn it into a resume you can send. I will not invent anything you have not said.': '¿No tienes currículum? Perfecto, empieza aquí. Cuéntame lo que has hecho y lo iré anotando mientras hablamos, y luego lo convertiré en un currículum que puedas enviar. No inventaré nada que no me hayas dicho.',
+    'Active': 'Activa',
+    'Closed': 'Cerrada',
+    'Available if you want it': 'Disponible si tú quieres',
+    'FIFO & remote-site roles': 'Turnos FIFO y remoto',
+    'ATS automation': 'Automatización ATS',
+    'Full-time employment': 'Empleo a tiempo completo',
+    'Temporary & contract': 'Temporal y contratos',
+    'Contract consulting': 'Consultoría contractual',
+    'About fly-in/fly-out work': 'Sobre el trabajo FIFO',
+    'Opens on a stated willingness to rotate': 'Se activa si indicas que quieres rotar',
     '{used} of {cap} sends used in the last 24 hours':
       '{used} de {cap} envíos usados en las últimas 24 horas',
   };
@@ -374,6 +435,23 @@
     }
   }
 
+  /**
+   * Translate a region that was built after the page's own pass ran.
+   *
+   * The track rows, the plan and the action list are all created in JavaScript
+   * once the relay answers, which is after setLang() has already walked the
+   * document. So they render in English on an otherwise Spanish page. Every
+   * dynamic renderer calls this after building its rows.
+   *
+   * Exported deliberately. applyToStashed stashes the original on first sight,
+   * which is what makes the toggle reversible, and hiding this kept the dynamic
+   * half of the page permanently untranslated.
+   */
+  function applyI18nTo(root) {
+    if (!root) return;
+    applyToStashed(root);
+  }
+
   window.JobbyI18n = {
     t: t,
     tn: tn,
@@ -383,6 +461,7 @@
     agentShort: agentShort,
     setLang: setLang,
     getLang: getLang,
+    applyI18nTo: applyI18nTo,
     current: function () { return current; },
     dict: DICT,
   };

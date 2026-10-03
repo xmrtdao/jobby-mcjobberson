@@ -1,0 +1,554 @@
+/*
+ * dashboard.css — the job seeker's progress page
+ *
+ * Separate from the candidate page's styles because this page has one job the
+ * front page does not: make a state readable at a glance. Everything here is
+ * built around that, and specifically around not letting a count imply more
+ * than it measured.
+ */
+
+.dashboard-page .hero-dashboard {
+  background: linear-gradient(180deg, rgba(127, 127, 127, 0.10), transparent 70%);
+}
+
+.dashboard-page .hero-note {
+  margin-top: 1rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.dashboard-page .hero-note a { color: var(--primary); }
+
+/* ── what needs you ────────────────────────────────────────────────────── */
+
+.needs-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.need {
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(127, 127, 127, 0.04);
+}
+
+/* Blocking is red and needs-answer is amber, and the severity is also written
+   in words at the top of each card. Colour is reinforcement, never the signal:
+   "blocking" and "needs an answer" are different urgencies and a reader who
+   cannot tell red from amber must still be able to act correctly. */
+.need-blocking { border-left: 3px solid #b03030; }
+.need-needs_answer { border-left: 3px solid #b8860b; }
+
+.need-head {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  margin-bottom: 0.3rem;
+}
+
+.need-severity {
+  font-size: 0.64rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  border: 1px solid currentColor;
+}
+
+.need-blocking .need-severity { color: #b03030; }
+.need-needs_answer .need-severity { color: #b8860b; }
+
+.need-kind {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.need-title {
+  margin: 0 0 0.3rem;
+  font-size: 0.92rem;
+}
+
+.need-detail,
+.need-action,
+.need-role {
+  margin: 0 0 0.25rem;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+.need-action { color: var(--text); font-style: italic; }
+.need-role { font-size: 0.72rem; }
+
+.need .button { margin-top: 0.5rem; }
+
+.all-clear {
+  padding: 1.1rem;
+  border: 1px solid #2f6f3f;
+  border-radius: 10px;
+  background: rgba(47, 111, 63, 0.07);
+}
+
+.all-clear h3 { margin: 0 0 0.3rem; font-size: 0.95rem; }
+.all-clear p { margin: 0; font-size: 0.82rem; color: var(--text-muted); line-height: 1.6; }
+
+/* ── mission ───────────────────────────────────────────────────────────── */
+
+.mission-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  align-items: start;
+}
+
+@media (max-width: 780px) { .mission-grid { grid-template-columns: 1fr; } }
+
+.mission-card,
+.mission-tracks,
+.dossier-snapshot {
+  padding: 0.95rem 1.05rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(127, 127, 127, 0.04);
+}
+
+.mission-state {
+  margin: 0 0 0.6rem;
+  font-size: 1.05rem;
+}
+
+.mission-subhead {
+  margin: 0 0 0.5rem;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+/* The kill switch alert is the loudest thing on this card, because a candidate
+   who switched it on has most likely forgotten, and "nothing is being sent" is
+   the single most expensive surprise this product can deliver. */
+.mission-alert {
+  margin: 0 0 0.7rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid #b03030;
+  border-radius: 8px;
+  background: rgba(176, 48, 48, 0.08);
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+
+.mission-alert strong { color: #b03030; }
+
+/* The weaker-identity note. Amber, not red: nothing is blocked and the page
+   must not imply otherwise. It exists so "which address am I sending from" is
+   answerable without asking, not to alarm. */
+.mission-note {
+  margin: 0.8rem 0 0;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid #b8860b;
+  border-radius: 8px;
+  background: rgba(184, 134, 11, 0.07);
+  font-size: 0.78rem;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+
+.mission-note strong { color: var(--text); }
+
+.mission-rows,
+.dossier-rows {
+  display: grid;
+  grid-template-columns: 9rem 1fr;
+  gap: 0.35rem 1rem;
+  margin: 0;
+  font-size: 0.8rem;
+}
+
+.mission-rows dt,
+.dossier-rows dt {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  padding-top: 0.1rem;
+}
+
+.mission-rows dd,
+.dossier-rows dd { margin: 0; overflow-wrap: anywhere; }
+
+.track-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.track-item { display: flex; flex-direction: column; gap: 0.1rem; }
+
+.track-name { font-size: 0.84rem; font-weight: 600; }
+
+/* The reason Jobby picked the track. Shown because a candidate who does not know
+   why a track is on will not trust it, and will eventually switch it off. */
+.track-why {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+/* ── applications ──────────────────────────────────────────────────────── */
+
+.app-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  margin-bottom: 1rem;
+}
+
+.stat-cell {
+  flex: 1 1 8.5rem;
+  min-width: 8.5rem;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(127, 127, 127, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+}
+
+.stat-value {
+  font-size: 1.6rem;
+  font-weight: 650;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-label { font-size: 0.78rem; font-weight: 600; }
+.stat-note { font-size: 0.68rem; color: var(--text-muted); }
+
+.app-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.app-card {
+  padding: 0.95rem 1.05rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(127, 127, 127, 0.04);
+}
+
+.app-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.3rem;
+}
+
+.app-title { margin: 0; font-size: 0.95rem; flex: 1; }
+
+/* The status is a word, not a colour. "Prepared, not sent" is the whole point of
+   this badge: a dashboard that said "active" would be a lie a candidate acts on. */
+.app-status {
+  font-size: 0.64rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.12rem 0.42rem;
+  border-radius: 4px;
+  border: 1px solid currentColor;
+}
+
+.app-status-prepared { color: var(--text-muted); }
+.app-status-running { color: #2f5f8f; }
+.app-status-submitted { color: #2f6f3f; }
+
+.app-meta,
+.app-view,
+.app-lead,
+.app-validated {
+  margin: 0 0 0.2rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.app-lead { color: var(--text); }
+
+.app-eligibility {
+  margin: 0.3rem 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.app-eligibility-eligible { color: #2f6f3f; }
+.app-eligibility-gaps { color: #b03030; }
+.app-eligibility-unknown_requirements { color: #b8860b; font-weight: 500; }
+
+.app-warn {
+  margin: 0.3rem 0;
+  padding: 0.4rem 0.55rem;
+  border-left: 2px solid #b8860b;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.app-notes {
+  list-style: none;
+  margin: 0.6rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.app-note {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  font-size: 0.77rem;
+  line-height: 1.5;
+  padding: 0.3rem 0.4rem;
+  border-radius: 5px;
+  background: rgba(127, 127, 127, 0.05);
+}
+
+.app-note-severity {
+  flex: 0 0 4.6rem;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 700;
+}
+
+.app-note-blocking .app-note-severity { color: #b03030; }
+.app-note-needs_answer .app-note-severity { color: #b8860b; }
+.app-note-info .app-note-severity { color: var(--text-muted); }
+.app-note-text { flex: 1; }
+
+.app-link {
+  display: inline-block;
+  margin-top: 0.6rem;
+  font-size: 0.76rem;
+  color: var(--primary);
+}
+
+/* ── outreach ──────────────────────────────────────────────────────────── */
+
+.outreach-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.outreach-item {
+  display: flex;
+  gap: 0.7rem;
+  align-items: baseline;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(127, 127, 127, 0.04);
+  font-size: 0.79rem;
+}
+
+.outreach-status {
+  flex: 0 0 4.2rem;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.outreach-sent .outreach-status { color: #2f6f3f; }
+.outreach-failed .outreach-status,
+.outreach-blocked .outreach-status { color: #b03030; }
+
+.outreach-main { flex: 1; display: flex; flex-direction: column; gap: 0.1rem; }
+.outreach-to { font-size: 0.74rem; color: var(--text-muted); }
+.outreach-subject { font-size: 0.8rem; }
+.outreach-error { font-size: 0.72rem; color: #b03030; }
+.outreach-when { font-size: 0.7rem; color: var(--text-muted); white-space: nowrap; }
+
+/* ── activity ──────────────────────────────────────────────────────────── */
+
+.activity-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.activity-item {
+  display: flex;
+  gap: 0.6rem;
+  align-items: baseline;
+  flex-wrap: wrap;
+  padding: 0.4rem 0.6rem;
+  border-radius: 6px;
+  font-size: 0.78rem;
+}
+
+.activity-item:nth-child(odd) { background: rgba(127, 127, 127, 0.04); }
+
+.activity-when {
+  flex: 0 0 5rem;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+
+.activity-tool {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.74rem;
+  min-width: 11rem;
+}
+
+.activity-state { font-size: 0.64rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; }
+.activity-ok .activity-state { color: #2f6f3f; }
+.activity-failed .activity-state { color: #b03030; }
+
+.activity-detail { font-size: 0.72rem; color: var(--text-muted); flex: 1 1 100%; }
+.activity-error { font-size: 0.72rem; color: #b03030; flex: 1 1 100%; }
+
+/* ── the record ────────────────────────────────────────────────────────── */
+
+.dossier-name { margin: 0; font-size: 1rem; }
+.dossier-title { margin: 0 0 0.6rem; font-size: 0.84rem; color: var(--text-muted); }
+
+/* The record's own gaps. This block is the reason the product is trusted: it
+   says out loud what it cannot show, so nobody reads a blank field as
+   "nothing to report". */
+.dossier-gaps {
+  margin-top: 0.8rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--border);
+}
+
+.dossier-gaps h4 {
+  margin: 0 0 0.35rem;
+  font-size: 0.78rem;
+  color: #b8860b;
+}
+
+.dossier-gaps ul {
+  margin: 0 0 0.4rem;
+  padding-left: 1.1rem;
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.dossier-snapshot .button { margin-top: 0.8rem; }
+
+nav a.is-current { color: var(--text); font-weight: 600; }
+
+/* ── the mission card, editable ────────────────────────────────────────────
+ *
+ * The card was a read-only definition list. These are the styles for the form
+ * that replaced it, kept visually inside the card rather than looking like a
+ * separate settings page, because it is the same record and should read as the
+ * same place.
+ *
+ * The save hint is given three states and all three are used: saving, saved, and
+ * failed. A save that fails and says nothing is the same defect as the one these
+ * styles are here to finish fixing.
+ */
+
+.mission-editor {
+  margin-top: 1.1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line, #e2e0da);
+}
+
+.mission-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 0.75rem 1rem;
+  align-items: end;
+}
+
+.mission-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.9rem;
+}
+
+.mission-field-label {
+  color: var(--muted, #6b6a63);
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
+}
+
+.mission-field input[type="text"],
+.mission-field input[type="tel"],
+.mission-field input[type="number"],
+.mission-field select {
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--line, #e2e0da);
+  border-radius: 4px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+  min-width: 0;
+}
+
+.mission-field input:focus,
+.mission-field select:focus {
+  outline: 2px solid var(--accent, #1c5c4a);
+  outline-offset: 1px;
+}
+
+/* The emergency stop spans the grid: it is a switch, and a switch crammed into
+   one column of a six-field form reads as a seventh field. */
+.mission-switch {
+  grid-column: 1 / -1;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--line, #e2e0da);
+  border-radius: 4px;
+  background: #fbfaf7;
+}
+
+.mission-switch input { width: 1.05rem; height: 1.05rem; }
+
+.mission-form-bar {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.mission-hint { font-size: 0.85rem; color: var(--muted, #6b6a63); }
+.mission-hint.is-good { color: var(--accent, #1c5c4a); }
+.mission-hint.is-bad { color: #a3271f; }
+
+/* Which record the name was read from. Small, and deliberately not styled as
+   anything the candidate has to act on — it is provenance, not a warning. */
+.mission-source,
+.mission-source-key {
+  font-size: 0.82rem;
+  color: var(--muted, #6b6a63);
+}

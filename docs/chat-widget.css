@@ -1,0 +1,257 @@
+/* The floating conversation panel.
+ *
+ * The chat itself is styled by styles.css — .jobby-log, .jobby-compose,
+ * .compose-bar and the attachment chips are all class-based and load on every
+ * page already. This file styles only the shell around them: the launcher, the
+ * panel, and the positioning.
+ *
+ * Two rules the rest of this file follows:
+ *
+ *   1. The panel must never cover the thing the candidate navigated to see. It is
+ *      anchored bottom-right and dismissible, and it opens closed on every page
+ *      except the front page.
+ *
+ *   2. On a small screen it is a sheet, not a corner box. A 380px panel in the
+ *      bottom-right of a phone covers the compose bar and most of the transcript,
+ *      which is the opposite of useful.
+ */
+
+.jobby-widget {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  z-index: 900;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.6rem;
+  /* The widget must not swallow clicks meant for the page behind it. The panel
+     and the launcher set their own pointer-events; the container does not. */
+  pointer-events: none;
+}
+
+/* ── the launcher ────────────────────────────────────────────────────────── */
+
+.jobby-widget-launcher {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1rem 0.6rem 0.6rem;
+  border: 1px solid var(--line, #e2e0da);
+  border-radius: 999px;
+  background: var(--primary, #1c5c4a);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+.jobby-widget-launcher:hover { transform: translateY(-1px); box-shadow: 0 10px 26px rgba(0, 0, 0, 0.22); }
+.jobby-widget-launcher:focus-visible { outline: 3px solid var(--accent, #1c5c4a); outline-offset: 2px; }
+
+.jobby-widget-launcher-glyph {
+  display: inline-grid;
+  place-items: center;
+  width: 1.85rem;
+  height: 1.85rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+}
+
+/* The label is the first thing to go when space is tight — the glyph and the
+   badge are the two things that carry meaning. */
+.jobby-widget-launcher-label { font-size: 0.92rem; }
+
+.jobby-widget-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 0.28rem;
+  border-radius: 999px;
+  background: #b3261e;
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* Open, the launcher is a way back to a known place rather than a mystery, so it
+   shrinks to the glyph. */
+.jobby-widget[data-state="open"] .jobby-widget-launcher-label { display: none; }
+.jobby-widget[data-state="open"] .jobby-widget-launcher { padding: 0.5rem; }
+
+/* ── the panel ───────────────────────────────────────────────────────────── */
+
+.jobby-widget-panel {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  width: min(25rem, calc(100vw - 2.5rem));
+  /* Bounded height with the transcript scrolling inside it, so the compose bar
+     stays reachable however long the conversation gets. The old inline version
+     grew until the page scrolled; in a corner panel that would push the whole
+     thing off screen. */
+  height: min(34rem, calc(100vh - 7rem));
+  border: 1px solid var(--line, #e2e0da);
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.22);
+  overflow: hidden;
+  animation: jobby-widget-in 140ms ease-out;
+}
+
+.jobby-widget-panel[hidden] { display: none; }
+
+@keyframes jobby-widget-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jobby-widget-panel { animation: none; }
+  .jobby-widget-launcher { transition: none; }
+}
+
+.jobby-widget-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem 0.6rem 0.9rem;
+  border-bottom: 1px solid var(--line, #e2e0da);
+  background: #fbfaf7;
+}
+
+.jobby-widget-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.jobby-widget-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Shown once, on the dashboard and the other pages, because a conversation that
+   used to be a section on the front page and is now a corner button needs saying
+   out loud once or it reads as "they removed the chat". */
+.jobby-widget-away {
+  margin: 0;
+  max-width: 15rem;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: var(--muted, #6b6a63);
+}
+
+.jobby-widget-close {
+  display: inline-grid;
+  place-items: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text, #1d1c19);
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.jobby-widget-close:hover { background: rgba(127, 127, 127, 0.14); }
+.jobby-widget-close:focus-visible { outline: 2px solid var(--primary, #1c5c4a); outline-offset: 1px; }
+.jobby-widget-close-glyph { pointer-events: none; }
+
+/* ── the chat inside ─────────────────────────────────────────────────────── */
+
+.jobby-widget-panel .jobby-chat {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+  border: 0;
+  padding: 0;
+}
+
+/* The transcript scrolls; the compose bar does not. Without this the log grows
+   and pushes the send button off the bottom of the panel. */
+.jobby-widget-panel .jobby-log { flex: 1; min-height: 0; overflow-y: auto; }
+
+.jobby-widget-panel .jobby-hint {
+  flex: none;
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border-top: 1px solid var(--line, #e2e0da);
+  font-size: 0.76rem;
+}
+
+/* Shown only when the browser has refused to speak and the candidate has not
+   interacted yet. One line, and it goes away the moment anything does speak.
+ *
+ * Without it, the feature is on, the toggle is on, and the page is silent — which
+ * reads as a broken widget rather than as a browser policy, and sends somebody
+ * looking for a setting that is already correct. */
+.jobby-audio-note {
+  flex: none;
+  margin: 0;
+  padding: 0.45rem 0.75rem;
+  border-top: 1px solid var(--line, #e2e0da);
+  background: #fbfaf7;
+  color: var(--muted, #6b6a63);
+  font-size: 0.74rem;
+  line-height: 1.4;
+}
+
+/* On the front page the section used to hold the heading and the "no resume"
+   reassurance, and said the conversation was still on this page. Both are now
+   untrue, so the heading stays and the claim does not. */
+#jobby .jobby-chat { display: none; }
+
+/* ── small screens: a sheet, not a corner box ────────────────────────────── */
+
+@media (max-width: 640px) {
+  .jobby-widget {
+    right: 0.75rem;
+    bottom: 0.75rem;
+    left: 0.75rem;
+    align-items: stretch;
+  }
+
+  .jobby-widget-panel {
+    width: 100%;
+    /* A sheet: the full usable height, so the transcript is readable and the
+       compose bar is above the keyboard rather than behind it. */
+    height: min(80vh, calc(100dvh - 6rem));
+  }
+
+  .jobby-widget-launcher { align-self: flex-end; }
+  .jobby-widget-away { display: none; }
+}
+
+/* Short viewports in landscape: a 34rem panel is taller than the window, so the
+   height clamp has to win over the width preference. */
+@media (max-height: 30rem) {
+  .jobby-widget-panel { height: calc(100vh - 5.5rem); }
+}
+
+/* Jobby's own introduction, at the top of the transcript.
+ *
+ * Marked because it is not a stored message: it is generated per session and never
+ * written to the server, so a reader looking at the transcript should not mistake
+ * it for part of the record. Tinted rather than bordered, so it reads as a header
+ * to the conversation rather than as a turn in it.
+ */
+.jobby-msg.is-greeting {
+  background: rgba(28, 92, 74, 0.05);
+  border-left: 2px solid var(--primary, #1c5c4a);
+  padding-left: 0.6rem;
+}
+
+.jobby-msg.is-greeting .jobby-text { font-weight: 500; }

@@ -123,6 +123,326 @@ function dossierList(values, emptyText) {
   return list;
 }
 
+/**
+ * One line of text, as a dossier record card.
+ *
+ * The counterpart to `dossierList`. A bullet list is right for a short inline set
+ * — skills, target roles, links — where the list is a qualifier on the card
+ * around it. It is the wrong shape for the sections a CV is built from: education,
+ * achievements, and the two sections reporting what could not be established. Those
+ * were rendered as bullets while employment was rendered as cards, so the dossier
+ * looked designed for its first section and unstyled for the rest, even though
+ * every line was the same kind of fact.
+ *
+ * `variant` changes the accent only, never the structure:
+ *   'is-gap'  — the source was silent. Grey.
+ *   'is-flag' — the extraction saw something it will not vouch for. Amber.
+ *   none      — stated plainly. Blue, same as employment.
+ *
+ * Achievements pass `is-compact`, because that card repeats more than any other on
+ * the page and does not need employment's vertical padding to be legible.
+ */
+function dossierEntryCards(values, variant) {
+  const items = Array.isArray(values) ? values.filter(Boolean) : [];
+  if (!items.length) return null;
+  const wrap = el('div', 'dossier-timeline');
+  const cls = 'dossier-entry' + (variant ? ' ' + variant : '');
+  items.forEach(value => {
+    const card = el('article', cls);
+    // The line goes in a heading, not straight into the card.
+    //
+    // A first version appended the text to the <article> directly, which produced
+    // the card and the drop shadow but left the line as body text — so those
+    // sections looked like employment from across the room and lost the blue
+    // headline only at reading distance. The heading is what carries the accent
+    // colour in the shared rule, so the line has to be inside one.
+    //
+    // h3 matches the employment cards, which already use it for the same purpose.
+    card.appendChild(el('h3', null, String(value)));
+    wrap.appendChild(card);
+  });
+  return wrap;
+}
+
+/**
+ * Confirmed achievements, as medal ribbons.
+ *
+ * These were one dossier card each — a bordered tile with a drop shadow, the same
+ * object as an employment card. Fifteen of them turned the bottom of the dossier
+ * into a wall of identical tiles, and the thing that is supposed to feel like
+ * evidence felt like inventory.
+ *
+ * A ribbon reads differently on purpose: it marks the line as something the
+ * candidate can point at, and it lets the achievements sit close together as a
+ * group rather than competing with the employment cards above them for attention.
+ * The tile remains the right shape for a job, a qualification or a gap — each of
+ * which is one record with fields. An achievement is a single sentence of prose,
+ * and a sentence does not need a 12px box around it.
+ *
+ * The medal is decorative and hidden from assistive technology; the sentence beside
+ * it is the content, and stands on its own without the ribbon.
+ */
+function dossierAchievements(values) {
+  const items = Array.isArray(values) ? values.filter(Boolean) : [];
+  if (!items.length) return null;
+  const list = el('ul', 'ach-list');
+  items.forEach(value => {
+    const row = el('li', 'ach-row');
+    const medal = el('span', 'ach-medal');
+    medal.setAttribute('aria-hidden', 'true');
+    row.appendChild(medal);
+    row.appendChild(el('p', 'ach-text', String(value)));
+    list.appendChild(row);
+  });
+  return list;
+}
+
+/* ------------------------------------------------------- dossier views ---- */
+/*
+ * One dossier, read differently for each kind of work.
+ *
+ * The switcher exists because a career can look thin to a site recruiter and
+ * strong to an editor without anything being different about the person. A
+ * former Marine who operates LV Switchers and now writes documentation has a
+ * resume that leads with office work; to a FIFO recruiter that resume says
+ * almost nothing, and it should not.
+ *
+ * Two rules this UI is built around:
+ *
+ *  - A view never invents. If the dossier has no equipment history, the FIFO
+ *    view says so in its own words rather than borrowing the nearest-sounding
+ *    office adjective. `whatItCannotShow` is rendered, not hidden, because a
+ *    view that quietly padded itself would be worse than no view at all.
+ *
+ *  - An interpretation is always shown next to the original. The service record
+ *    stays verbatim and the site vocabulary appears beside it, labelled as our
+ *    reading, so the candidate can correct it.
+ */
+
+const dvEls = {};
+let dvViews = [];
+let dvActive = null;
+
+function cacheDossierViewEls() {
+  for (const id of ['dossier-views', 'dv-note', 'dv-tabs', 'dv-body']) {
+    dvEls[id] = document.getElementById(id);
+  }
+}
+
+function renderDossierViews(views, defaultView) {
+  cacheDossierViewEls();
+  if (!dvEls['dossier-views']) return;
+  if (!Array.isArray(views) || !views.length) {
+    dvEls['dossier-views'].hidden = true;
+    return;
+  }
+  dvViews = views;
+
+  const tabs = dvEls['dv-tabs'];
+  const body = dvEls['dv-body'];
+  if (!tabs || !body) return;
+  tabs.replaceChildren();
+  body.replaceChildren();
+
+  views.forEach((v) => {
+    const tab = el('button', 'dv-tab' + (v.empty ? ' is-empty' : ''), v.label);
+    tab.type = 'button';
+    tab.setAttribute('role', 'tab');
+    tab.dataset.view = v.view;
+    // A view with nothing in it is still offered — that is information — but it
+    // is marked, so the count does not imply a fully populated view.
+    tab.appendChild(el('span', 'dv-count', v.empty ? '—' : String(v.sectionCount)));
+    tab.addEventListener('click', () => selectView(v.view));
+    tabs.appendChild(tab);
+  });
+
+  const note = dvEls['dv-note'];
+  if (note) {
+    note.textContent =
+      'One dossier, read differently for each kind of work. Nothing here is invented to '
+      + 'fill a gap — a view with little to show says so.';
+  }
+
+  dvEls['dossier-views'].hidden = false;
+  // Prefer the view the active track implies, so the first thing a FIFO
+  // candidate sees is the FIFO framing rather than an arbitrary one.
+  selectView(defaultView && dvViews.some((v) => v.view === defaultView) ? defaultView : null);
+}
+
+/**
+ * One record from a dossier section, as a line of text.
+ *
+ * This was inline and was written for employment and nothing else: it read
+ * `branch`, `role`, `unit`, `description` and `company`, joined them, and — when
+ * every one of them was absent — fell through to `JSON.stringify(v)`.
+ *
+ * An education record has none of those keys. It has `degree`, `field`,
+ * `institution` and `year`. So in any view that shows education it rendered as raw
+ * JSON, in a list of otherwise well-formed lines, which reads as the parser having
+ * failed when the parse was perfect. "Business and administration" is where it
+ * showed worst, because `office` puts `education` first in its order and a broken
+ * first line makes the whole section look wrong.
+ *
+ * Per-field rather than per-object, because the shape is a property of what the
+ * record *is* and only the section knows that. Guessing from the keys present would
+ * mean a military record that happened to carry an `institution` rendered as a
+ * qualification.
+ *
+ * Nothing here is invented. Every part comes from a field the parser wrote, and a
+ * record with none of the expected keys lists its own contents rather than being
+ * summarised — an unrecognised shape should be visible, not tidied into a sentence
+ * the source did not say.
+ */
+function formatRecord(field, v) {
+  if (field === 'education') return educationLine(v);
+
+  // Employment and military service, unchanged: this is the shape those sections
+  // have always been rendered from and the wording is load-bearing.
+  const who = [v.branch, v.role, v.unit].filter(Boolean).join(' · ');
+  const line = [who, v.description || v.company].filter(Boolean).join(' — ');
+  if (line) return line;
+
+  // Anything else. A certification with an issuer, a qualification with a
+  // credential — read the keys it actually has instead of dumping JSON at the
+  // reader. Tried in the order a reader wants them.
+  const parts = [];
+  const named = ['credential', 'qualification', 'title', 'name']
+    .filter((k) => typeof v[k] === 'string' && v[k].trim())
+    .map((k) => v[k].trim());
+  if (named.length) parts.push(named.join(' '));
+  const org = v.organization || v.issuer || v.provider || v.institution;
+  if (org) parts.push(String(org));
+  const when = [v.date, v.year, v.until, v.expires].filter(Boolean).join(' – ');
+  if (when) parts.push('(' + when + ')');
+  if (parts.length) return parts.join(' — ');
+
+  // Last resort: its own fields, named, so an unrecognised record is legible and
+  // obviously a record rather than a sentence.
+  const entries = Object.entries(v)
+    .filter(([, val]) => val !== null && val !== undefined && val !== '' && typeof val !== 'object')
+    .map(([k, val]) => k + ': ' + val);
+  return entries.length ? entries.join(' · ') : '(empty record)';
+}
+
+/**
+ * A qualification, as one line.
+ *
+ * Shared with the education block further down so the two renderings of one fact
+ * cannot drift apart. They had already been written separately, which is how one of
+ * them ended up correct and the other printing JSON.
+ */
+function educationParts(item) {
+  if (!item || typeof item !== 'object') return null;
+  const degree = [item.degree, item.field].filter(Boolean).join(' ');
+  const institution = item.institution || '';
+  // The institution is only appended when there is a qualification to put in front
+  // of it. With only an institution, the old form produced "Only the school - Only
+  // the school", which is the sort of thing a reader notices and stops trusting the
+  // rest of the page over.
+  const lead = degree || institution;
+  const tail = (institution && degree) ? ' - ' + institution : '';
+  const year = item.year ? ' (' + item.year + ')' : '';
+
+  // The qualification is the headline and the institution and year sit under it,
+  // which is how a reader of a CV expects the pair to be arranged — and it is what
+  // lets education use the same card as employment. Every part is a field the
+  // record actually carries: an absent degree leaves the headline blank rather than
+  // borrowing the institution to fill it, because "University of X" presented as a
+  // qualification is a claim the resume never made.
+  return {
+    headline: lead,
+    detail: (tail + year).trim(),
+    line: (lead + tail + year).trim(),
+  };
+}
+
+function educationLine(item) {
+  if (!item || typeof item !== 'object') return String(item == null ? '' : item);
+  const parts = educationParts(item);
+  return parts ? parts.line : '';
+}
+
+function selectView(viewId) {
+  const body = dvEls['dv-body'];
+  const tabs = dvEls['dv-tabs'];
+  if (!body || !tabs) return;
+  const v = dvViews.find((x) => x.view === viewId) || dvViews.find((x) => !x.empty) || dvViews[0];
+  if (!v) return;
+  dvActive = v.view;
+
+  Array.from(tabs.children).forEach((t) => {
+    const on = t.dataset.view === v.view;
+    t.classList.toggle('is-active', on);
+    t.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
+
+  body.replaceChildren();
+
+  const head = el('div', 'dv-viewhead');
+  head.appendChild(el('p', 'dv-viewlabel', v.label));
+  head.appendChild(el('p', 'dv-blurb', v.blurb));
+  head.appendChild(el('p', 'dv-audience', 'Written for: ' + v.audience));
+  body.appendChild(head);
+
+  if (v.empty) {
+    body.appendChild(el('p', 'dossier-muted',
+      'This view has nothing to show from the dossier. That is a gap in what is recorded, '
+      + 'not a judgement on you — tell Jobby in chat and it will write it in.'));
+  }
+
+  v.sections.forEach((s) => {
+    const card = el('article', 'dv-section' + (s.lead ? ' is-lead' : ''));
+    card.appendChild(el('h4', null, s.label));
+    const list = el('ul', 'dossier-list');
+    // Derived sections arrive as {items|text, derivedFrom} rather than a bare
+    // value, so the shape is unwrapped here instead of being special-cased in
+    // three places below.
+    const raw = (s.value && typeof s.value === 'object' && !Array.isArray(s.value)
+      && (s.value.items || s.value.text)) ? (s.value.items || [s.value.text])
+      : (Array.isArray(s.value) ? s.value : [s.value]);
+    raw.forEach((v2) => {
+      if (v2 && typeof v2 === 'object') {
+        list.appendChild(el('li', null, formatRecord(s.field, v2)));
+      } else {
+        list.appendChild(el('li', null, v2));
+      }
+    });
+    card.appendChild(list);
+
+    // Where this content came from. A view that read "open to rotations" out of
+    // the summary has to say so, or the candidate cannot tell a recorded field
+    // from our reading of a sentence — and cannot correct the one that is wrong.
+    if (s.derivedFrom) {
+      card.appendChild(el('p', 'dv-derived', 'Read ' + s.derivedFrom));
+    }
+
+    // The interpretation, always beside the original and always labelled.
+    if (s.alsoShows && s.alsoShows.length) {
+      const also = el('div', 'dv-also');
+      also.appendChild(el('p', 'dv-also-label', 'Also readable as'));
+      const ul = el('ul', 'dv-also-list');
+      s.alsoShows.forEach((x) => ul.appendChild(el('li', null, x)));
+      also.appendChild(ul);
+      if (s.alsoShows.reason) also.appendChild(el('p', 'dv-also-reason', s.alsoShows.reason));
+      card.appendChild(also);
+    }
+    body.appendChild(card);
+  });
+
+  // Rendered, not hidden. A view that quietly omitted its own gaps would read
+  // as complete, and that is the failure this whole module is built to avoid.
+  if (v.whatItCannotShow && v.whatItCannotShow.length) {
+    const gaps = el('div', 'dv-gaps');
+    gaps.appendChild(el('p', 'dv-gaps-label', 'This view cannot show'));
+    const ul = el('ul', 'dossier-list');
+    v.whatItCannotShow.forEach((g) => ul.appendChild(el('li', null, g)));
+    gaps.appendChild(ul);
+    body.appendChild(gaps);
+  }
+
+  if (v.note) body.appendChild(el('p', 'dv-footnote', v.note));
+}
+
 // "Lead Platform Engineer, Acme Systems" + "March 2021 - present"
 function employmentLine(job) {
   const who = [job.title, job.company].filter(Boolean).join(', ');
@@ -158,7 +478,21 @@ function renderDossier(profile) {
   identity.push(el('p', 'dossier-confidence',
     tn('Extraction confidence') + ': ' + confidenceLabel(profile.confidence)));
   const identityCard = dossierCard(tn('Identity'), identity);
-  if (identityCard) grid.appendChild(identityCard);
+  // Identity is the first thing in the dossier, alone, before anything else.
+  //
+  // It used to be the first card in a grid of seven, so the reader met their own
+  // name and then had to scroll past a summary, a skills list, inferred job
+  // fields and a set of target roles before reaching the employment history they
+  // came for. The supporting cards are all real and all worth having — they are
+  // also, by construction, the parts derived from the resume rather than the
+  // parts the person is.
+  //
+  // So: identity, then employment, then the derived material. That is also the
+  // order of trust. A name and a job held are things the resume stated; "job
+  // fields" and "domain expertise" are this product's reading of them, and there
+  // is no reason to ask a reader to weigh an inference before they have seen the
+  // fact it was inferred from.
+  if (identityCard) dossierBody.appendChild(identityCard);
 
   const summaryCard = dossierCard(tn('Summary'), [el('p', 'dossier-summary', profile.summary)]);
   if (summaryCard) grid.appendChild(summaryCard);
@@ -185,9 +519,9 @@ function renderDossier(profile) {
     [dossierList(roles, tn('None listed'))]);
   if (rolesCard) grid.appendChild(rolesCard);
 
-  dossierBody.appendChild(grid);
-
-  // Employment gets full width: it carries the highlight bullets.
+  // Employment gets full width: it carries the highlight bullets. It comes
+  // directly after identity, and the derived cards above follow it — see the note
+  // at the identity card for why the order is trust order rather than arbitrary.
   const jobs = Array.isArray(profile.employment) ? profile.employment.filter(Boolean) : [];
   if (jobs.length) {
     const wrap = el('div', 'dossier-timeline');
@@ -206,35 +540,57 @@ function renderDossier(profile) {
     dossierBody.appendChild(wrap);
   }
 
+  // The derived cards, now that the facts they were inferred from are above them.
+  // Appended only if something landed in it — an empty grid would otherwise render
+  // as a stray band of nothing.
+  if (grid.children.length) dossierBody.appendChild(grid);
+
+  // Education, and the sections below it, were plain lists while employment was a
+  // run of cards, so the dossier's visual language stopped at the Experience
+  // subhead. They are cards now, built by the same helper, from the same record.
   const education = Array.isArray(profile.education) ? profile.education.filter(Boolean) : [];
-  const eduItems = education.map(item => {
-    const degree = [item.degree, item.field].filter(Boolean).join(' ');
-    const tail = item.institution ? ' — ' + item.institution : '';
-    const year = item.year ? ' (' + item.year + ')' : '';
-    return ((degree || item.institution || '') + tail + year).trim();
-  }).filter(Boolean);
+  // The same helper the dossier views use, for the same reason: two renderings of
+  // one fact, written separately, is how one of them ends up correct and the other
+  // printing JSON.
+  const eduItems = education.map(educationLine).filter(Boolean);
   if (eduItems.length) {
     dossierBody.appendChild(el('h3', 'dossier-subhead', tn('Education')));
-    appendList(dossierBody, dossierList(eduItems, null));
+    const eduWrap = el('div', 'dossier-timeline');
+    education.forEach(item => {
+      const parts = educationParts(item);
+      if (!parts || !parts.line) return;
+      const card = el('article', 'dossier-entry');
+      // Headline only when the record states a qualification. A record with an
+      // institution and no degree still gets a card — the institution is simply
+      // not promoted into the headline slot.
+      if (parts.headline && parts.headline !== parts.detail) {
+        card.appendChild(el('h3', null, parts.headline));
+        if (parts.detail) card.appendChild(el('p', 'dossier-muted', parts.detail));
+      } else {
+        card.appendChild(el('h3', null, parts.line));
+      }
+      eduWrap.appendChild(card);
+    });
+    dossierBody.appendChild(eduWrap);
   }
 
   const achievements = Array.isArray(profile.achievements) ? profile.achievements.filter(Boolean) : [];
   if (achievements.length) {
     dossierBody.appendChild(el('h3', 'dossier-subhead', tn('Confirmed achievements')));
-    appendList(dossierBody, dossierList(achievements, null));
+    dossierBody.appendChild(dossierAchievements(achievements));
   }
 
   // Present so the reader can see the limits of the extraction.
   const gaps = gapList(profile.not_stated);
   if (gaps.length) {
     dossierBody.appendChild(el('h3', 'dossier-subhead', tn('Not stated in resume')));
-    appendList(dossierBody, dossierList(gaps, null));
+    dossierBody.appendChild(dossierEntryCards(gaps, 'is-gap'));
   }
 
   const flags = gapList(profile.verification_flags);
   if (flags.length) {
     dossierBody.appendChild(el('h3', 'dossier-subhead', tn('Flagged for verification')));
-    appendList(dossierBody, dossierList(flags, null));
+    dossierBody.appendChild(dossierEntryCards(flags, 'is-flag'));
   }
 
   dossierHeading.textContent = tn('Dossier for') + ' ' + name;
@@ -400,6 +756,54 @@ function stopDossierPolling() {
   }
 }
 
+/**
+ * Fetch the dossier's views from the relay.
+ *
+ * Goes to /api/jobby/session rather than to this origin's own API, because the
+ * views are computed on the relay where the dossier lives, and because this
+ * server's session cookie is the same jobby_sid the relay resolves — so the
+ * candidate sees their own views and nobody else's.
+ *
+ * Failure is silent by design: the dossier itself still renders, and a missing
+ * view switcher is a smaller loss than an error over a panel that is otherwise
+ * fine. It is a convenience surface, not the record.
+ */
+async function loadDossierViews() {
+  try {
+    const res = await fetch('/api/jobby/session', {
+      headers: { Accept: 'application/json' },
+      credentials: 'same-origin',
+    });
+    if (!res.ok) return;
+    const s = await res.json().catch(() => ({}));
+    if (!s.views) return;
+    renderDossierViews(s.views, s.defaultView);
+  } catch {
+    /* the dossier is still there; the switcher is optional */
+  }
+}
+
+// Also on page load, not only after an upload.
+//
+// The five readings of the dossier were reachable only as a side effect of
+// uploading a file in *this* page load, because `loadDossierViews` was called from
+// one place: the poll that watches an upload finish. So a candidate who had a
+// dossier, refreshed, or arrived from the dashboard, saw the dossier panel with no
+// view switcher on it at all — the session was returning all five views, complete
+// with content, and nothing was asking for them.
+//
+// The same bug the resume profile panel had, in the panel above it: a record that
+// exists being displayed only as a side effect of the act of creating it, so a
+// refresh reads as data loss. Cost here was a whole feature that looked missing.
+//
+// The fetch is the same one the upload path makes and is already silent on failure,
+// so this cannot make the page worse if the relay is down.
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', loadDossierViews);
+} else {
+  loadDossierViews();
+}
+
 function pollDossier(requestId) {
   stopDossierPolling();
   const tick = async () => {
@@ -413,6 +817,12 @@ function pollDossier(requestId) {
         hideDossierProgress();
         showDossierActions();
         renderDossier(body.profile);
+        // Views arrive with the dossier rather than from a second fetch.
+        //
+        // The page's session call lives in jobby.js, which loads after this file,
+        // so reaching for it here would be a race. The poll response is already
+        // the moment the dossier exists, so it is the right place to ask.
+        loadDossierViews();
         return;
       }
       if (body.status === 'processing') {

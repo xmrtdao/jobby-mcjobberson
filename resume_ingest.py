@@ -481,9 +481,53 @@ def _extract_skills(text: str) -> list[str]:
             if not re.search(r"[.!?]", label):
                 add(label)
             block = category.group("values")
-        for raw_skill in re.split(r"[,;|\u2022\u00b7*]", block):
+        for raw_skill in _split_skill_list(block):
             add(raw_skill)
     return skills
+
+
+# A separator only separates when it is not inside a qualifier.
+_SKILL_SEPARATORS = re.compile(r"[,;|\u2022\u00b7*]")
+_OPENERS = "([{"
+_CLOSERS = ")]}"
+
+
+def _split_skill_list(block):
+    """Split a skills line on its separators, ignoring any inside brackets.
+
+    A comma inside parentheses is nearly always part of the skill rather than a
+    boundary, and splitting on it destroys the entry — see the note above. Real
+    skill lines use all three bracket kinds ("Python (Django, Flask)", "Scheduling
+    [ Outlook, Google ]", "Configuration {XML, YAML}"), so depth is tracked for
+    each.
+
+    An unbalanced closer is treated as an ordinary character rather than allowed to
+    drive the depth negative. Negative depth is the dangerous case: every subsequent
+    separator in the document stops separating, and one stray ")" turns the rest of
+    a resume into a single enormous skill. An unclosed opener is likewise left
+    alone — the line still has a usable first entry, and inventing a boundary to
+    balance it would be worse than a slightly long one.
+    """
+    parts = []
+    buf = []
+    depth = 0
+    for ch in block:
+        if ch in _OPENERS:
+            depth += 1
+            buf.append(ch)
+            continue
+        if ch in _CLOSERS:
+            if depth > 0:
+                depth -= 1
+            buf.append(ch)
+            continue
+        if depth == 0 and _SKILL_SEPARATORS.match(ch):
+            parts.append("".join(buf))
+            buf = []
+            continue
+        buf.append(ch)
+    parts.append("".join(buf))
+    return [p.strip() for p in parts if p.strip()]
 
 
 # A job header line, e.g. "Lead Platform Engineer - Acme Systems (March 2021 -

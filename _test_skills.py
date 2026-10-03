@@ -71,6 +71,39 @@ print("\n--- multiple blocks ---")
 r = _extract_skills("SKILLS: Python, Go\nTOOLS: Docker, Terraform")
 check("two blocks", r == ["Python", "Go", "Docker", "Terraform"], r)
 
+print("\n--- separators inside a qualifier are not boundaries ---")
+# The real case: a comma-separated qualifier inside brackets is part of the skill,
+# not a list of skills. Splitting on it turned one true statement into three, and
+# the dossier showed all three to the candidate as fact.
+r = _extract_skills("SKILLS: Cross-department collaboration (Marketing, Admissions, Success), CRM")
+check("paren qualifier stays whole",
+      r == ["Cross-department collaboration (Marketing, Admissions, Success)", "CRM"], r)
+
+r = _extract_skills("SKILLS: Python (Django, Flask), Go")
+check("technology qualifier", r == ["Python (Django, Flask)", "Go"], r)
+
+r = _extract_skills("SKILLS: Scheduling [Outlook, Google], Admin")
+check("square brackets", r == ["Scheduling [Outlook, Google]", "Admin"], r)
+
+r = _extract_skills("SKILLS: Configuration {XML, YAML}, Bash")
+check("curly braces", r == ["Configuration {XML, YAML}", "Bash"], r)
+
+r = _extract_skills("SKILLS: Budgeting; forecasting (Excel; SQL), Reporting")
+check("semicolons inside parens too", r == ["Budgeting", "forecasting (Excel; SQL)", "Reporting"], r)
+
+print("\n--- unbalanced brackets must not swallow the document ---")
+# A stray ")" driving the depth negative makes every later separator stop
+# separating, which turns the rest of a resume into one enormous "skill". The
+# label still has to match for any of this to be reached, so the stray bracket
+# goes inside the block rather than in the heading.
+r = _extract_skills("SKILLS: Python), Go, SQL")
+check("stray closer does not stop splitting",
+      r == ["Python)", "Go", "SQL"], r)
+
+r = _extract_skills("SKILLS: Python (Django, Go")
+check("unclosed paren keeps the first entry usable",
+      r == ["Python (Django, Go"], r)
+
 print()
 if fails:
     print(f"{len(fails)} FAILED: " + "; ".join(fails))

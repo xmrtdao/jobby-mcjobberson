@@ -1,0 +1,245 @@
+/* The jobs list.
+ *
+ * Styled to read as a list of postings rather than as marketing: one column, a
+ * role that is the link, the employer and location underneath, and the source
+ * always visible. The source is not a footnote on this page — it is the part that
+ * tells a reader how much to trust the row, so it sits on the row.
+ *
+ * `.is-absent` is used for facts that are genuinely not stated. It is dimmed
+ * rather than hidden, and never replaced with a placeholder: a candidate
+ * filtering by city cannot tell an invented location from a real one, and will act
+ * on the wrong one.
+ */
+
+.jobs-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.9rem;
+}
+
+.jobs-search { flex: 1 1 16rem; min-width: 0; }
+.jobs-search input,
+.jobs-select select {
+  width: 100%;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--line, #e2e0da);
+  border-radius: 4px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+}
+
+.jobs-search input:focus,
+.jobs-select select:focus {
+  outline: 2px solid var(--accent, #1c5c4a);
+  outline-offset: 1px;
+}
+
+.jobs-select { flex: 0 1 15rem; }
+
+/* ── the figures ─────────────────────────────────────────────────────────── */
+
+/* Three numbers as three numbers.
+ *
+ * These were one sentence in 0.85rem muted grey, which is the shape that gets
+ * skimmed to nothing. The count of jobs on the board is the first fact a reader
+ * wants and it was the last thing in the line, at the size of a footnote.
+ *
+ * The figures are the largest type in the section and the labels are the
+ * smallest, so the eye lands on 1,315 before it lands on the words. */
+.jobs-stats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem 2rem;
+  margin: 0 0 0.9rem;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--line, #e2e0da);
+  border-left: 3px solid var(--primary, #1c5c4a);
+  border-radius: 4px;
+  background: #fbfaf7;
+}
+
+.jobs-stat {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  margin: 0;
+}
+
+.jobs-stat-value {
+  font-size: 1.7rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  color: var(--text, #1d1c19);
+  font-variant-numeric: tabular-nums;
+}
+
+.jobs-stat-label {
+  font-size: 0.82rem;
+  color: var(--muted, #6b6a63);
+}
+
+/* The "shown now" figure is a fact about the page, not about the market, so it is
+   held back visually. Still legible — dimmed, not hidden, because a reader who
+   cannot see it cannot know the list is partial. */
+.jobs-stat.is-quiet .jobs-stat-value {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--muted, #6b6a63);
+}
+
+@media (max-width: 640px) {
+  .jobs-stats { gap: 0.5rem 1.25rem; padding: 0.6rem 0.7rem; }
+  .jobs-stat-value { font-size: 1.4rem; }
+  .jobs-stat.is-quiet .jobs-stat-value { font-size: 1rem; }
+}
+
+/* The trust note. Given a border and its own background so it cannot be mistaken
+   for a caption, because it is the sentence that says nobody has checked any of
+   this. */
+.jobs-trust {
+  margin: 0 0 1rem;
+  padding: 0.6rem 0.75rem;
+  border-left: 3px solid var(--accent, #1c5c4a);
+  background: rgba(28, 92, 74, 0.05);
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: var(--text, #1d1c19);
+}
+
+.job-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--line, #e2e0da);
+}
+
+.job-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.7rem 0.25rem;
+  border-bottom: 1px solid var(--line, #e2e0da);
+}
+
+.job-row:hover { background: #fbfaf7; }
+
+.job-main { min-width: 0; }
+
+.job-role {
+  font-weight: 600;
+  color: var(--text, #1d1c19);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+.job-role:hover { border-bottom-color: var(--primary, #1c5c4a); }
+.job-role:focus-visible { outline: 2px solid var(--accent, #1c5c4a); outline-offset: 2px; }
+
+.job-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.9rem;
+  margin: 0.2rem 0 0;
+  font-size: 0.85rem;
+  color: var(--muted, #6b6a63);
+}
+
+/* "Location not stated" is a fact, not a failure. It reads in the same weight as
+   the others and in a lighter colour, so the row does not appear to be missing a
+   field that failed to load. */
+.job-fact.is-absent,
+.job-prov.is-absent { color: #a09c92; font-style: italic; }
+
+.job-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.2rem;
+  flex: none;
+  max-width: 15rem;
+  text-align: right;
+}
+
+.job-feed {
+  font-size: 0.76rem;
+  color: var(--muted, #6b6a63);
+}
+
+/* The provenance of the employer name. This is the whole reason the source is on
+   the row rather than in a footer. */
+.job-prov {
+  font-size: 0.72rem;
+  color: var(--muted, #6b6a63);
+  border-bottom: 1px dotted var(--line, #e2e0da);
+  cursor: help;
+}
+
+.jobs-more { margin-top: 1rem; }
+
+/* ── the per-source table ────────────────────────────────────────────────── */
+
+.jobs-sources {
+  margin-top: 1.5rem;
+  border-top: 1px solid var(--line, #e2e0da);
+  padding-top: 0.9rem;
+}
+
+.jobs-sources summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.jobs-sources summary:focus-visible { outline: 2px solid var(--accent, #1c5c4a); outline-offset: 2px; }
+
+.jobs-reg-group {
+  margin: 1rem 0 0.4rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--muted, #6b6a63);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.jobs-reg-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.jobs-reg-table th,
+.jobs-reg-table td {
+  padding: 0.3rem 0.5rem;
+  text-align: left;
+  border-bottom: 1px solid var(--line, #e2e0da);
+}
+
+.jobs-reg-table th {
+  font-weight: 600;
+  color: var(--muted, #6b6a63);
+}
+
+.jobs-reg-table .is-num { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* An employer read out of a title is a different kind of claim from one an
+   employer published. Dimmed so the distinction is visible at a glance rather
+   than requiring both numbers to be compared. */
+.jobs-reg-table .is-derived { color: #a09c92; }
+
+.jobs-reg-problems ul { margin: 0; padding-left: 1.1rem; font-size: 0.85rem; }
+.jobs-reg-foot { font-size: 0.8rem; color: var(--muted, #6b6a63); }
+
+@media (max-width: 640px) {
+  /* Stacked, so the source and the provenance are not squeezed to a column too
+     narrow to read the caveat in — which would defeat the point of showing it. */
+  .job-row { flex-direction: column; gap: 0.35rem; }
+  .job-meta { align-items: flex-start; text-align: left; max-width: none; }
+  .jobs-reg-table { font-size: 0.76rem; }
+  .jobs-reg-table th:nth-child(4),
+  .jobs-reg-table td:nth-child(4) { display: none; }
+}
