@@ -3,9 +3,42 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Jobby McJobberson — The Intelligent Opportunity Command Center</title>
-  <meta name="description" content="Jobby McJobberson is a multi-track opportunity and outreach engine for precision career orchestration.">
-  <link rel="stylesheet" href="styles.css">
+    <title>Jobby McJobberson — Your personal job agent</title>
+    <meta name="description" content="Upload a resume and get a full dossier, an honest read on which income tracks your background supports, and a plan ordered by what pays you soonest. Jobby then sources roles, researches targets, writes the outreach and follows up.">
+    <meta property="og:type" content="website">
+  <meta property="og:title" content="Jobby McJobberson — Your personal job agent">
+  <meta property="og:description" content="Upload a resume. Get a dossier, an honest read on what your background supports, and outreach that gets sent, followed up, and negotiated. Not stated is left unstated.">
+  <meta property="og:url" content="https://jobbymcjobberson.com/">
+  <meta property="og:site_name" content="Jobby McJobberson">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:image" content="https://jobbymcjobberson.com/jobby-og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Jobby McJobberson — your personal job agent. Dossier built, tracks opened, and what it will not invent.">
+  <meta property="og:image:type" content="image/png">
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Jobby McJobberson — Your personal job agent">
+  <meta name="twitter:description" content="Upload a resume. Get a dossier, an honest read on what your background supports, and outreach that gets sent, followed up, and negotiated.">
+  <meta name="twitter:image" content="https://jobbymcjobberson.com/jobby-og.png">
+  <meta name="twitter:image:alt" content="Jobby McJobberson — your personal job agent.">
+
+  <meta name="author" content="31 Harbor">
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+  <meta name="googlebot" content="index, follow">
+  <meta name="theme-color" content="#0b0d12">
+  <link rel="canonical" href="https://jobbymcjobberson.com/">
+
+  <link rel="icon" href="/jobby-favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="icon" href="/jobby-favicon-16.png" sizes="16x16" type="image/png">
+  <link rel="icon" href="/jobby-favicon-512.png" sizes="512x512" type="image/png">
+  <link rel="apple-touch-icon" href="/jobby-favicon-512.png">
+  <link rel="manifest" href="/site.webmanifest">
+    <link rel="stylesheet" href="styles.css">
+  <!-- The floating panel's shell. The chat inside it is styled by styles.css,
+       which is class-based and already loaded on every page. -->
+  <link rel="stylesheet" href="chat-widget.css">
+  <link rel="stylesheet" href="jobs.css">
   <script src="i18n.js" defer></script>
 </head>
 <body>
@@ -18,9 +51,41 @@
       </span>
     </a>
     <nav aria-label="Primary navigation">
-      <a href="#funnel">Funnel</a>
-      <a href="#tracks">Tracks</a>
+      <!-- "Home" goes to the top of the page, which is what the word means. It used
+           to read "Funnel" and jump to a section halfway down called "Four things,
+           done properly" — an id left over from an earlier draft, promoted to a nav
+           label, pointing at something that is not a funnel. The four feature cards
+           are still on the page; they just do not need a label claiming to be the
+           way home.
+
+           "Tracks" became "Jobs", and points at the job list rather than at the
+           strategy table it used to name. The five-track table is still here and
+           still explains why Jobby behaves differently for different work — it is
+           the most reassuring thing on the page for somebody deciding whether this
+           understands their situation. It just is not a list of jobs, and calling it
+           one would have been the third name that did not describe the thing. -->
+      <a href="#top">Home</a>
+      <a href="#jobs">Jobs</a>
+      <a href="#tracks">How it works</a>
       <a href="#audit">Audit</a>
+      <!-- Three pages, two audiences, and a conversation that follows you between
+           them.
+
+           The chat used to be a section halfway down this page, on the reasoning
+           that a person mid-conversation should not have to scroll past a progress
+           report to reach the textbox. That was half right: the scroll was the
+           problem, and the fix was to stop making the chat a thing you scrolled
+           to rather than to keep it out of the flow. It is a floating panel now,
+           present on every candidate page, so a question asked on the dashboard
+           does not require coming back here to ask it, and a reply that lands
+           while you are reading your applications is one click away instead of
+           one navigation away.
+
+           The employers link is up top rather than buried in a footer because
+           the person most likely to want it is someone already on this page
+           thinking "I am the one who needs to post this". -->
+      <a href="dashboard.html">Dashboard</a>
+      <a href="employers.html">Employers</a>
       <!-- The label is the language being switched TO, which is the
            convention that actually helps: someone who cannot read the
            language currently on screen still recognises the word for
@@ -71,32 +136,7 @@
           </div>
           <p class="drop-status" id="resume-status" role="status" aria-live="polite"></p>
         </section>
-      </div>
-    </section>
 
-    <!-- Results sit below the hero, on the flat page. Inside it they grew
-         the section without bound and were laid over the moving background. -->
-      <section class="parsed-profile-section" id="parsed-profile" aria-label="Parsed resume profile" hidden>
-        <div class="section-heading">
-          <p class="eyebrow">Source-derived profile</p>
-          <h2>Resume signals ready for review</h2>
-          <p>Only content found in the uploaded resume is shown.</p>
-        </div>
-        <div class="parsed-profile-grid">
-          <article class="parsed-card">
-            <h3>Skills</h3>
-            <ul id="parsed-skills"></ul>
-          </article>
-          <article class="parsed-card">
-            <h3>Related job fields</h3>
-            <ul id="parsed-fields"></ul>
-          </article>
-          <article class="parsed-card">
-            <h3>Links</h3>
-            <ul id="parsed-links"></ul>
-          </article>
-        </div>
-      </section>
       <section class="parsed-profile-section" id="dossier-panel" aria-label="AI candidate dossier" aria-live="polite" hidden>
         <div class="section-heading">
           <p class="eyebrow">AI dossier</p>
@@ -123,7 +163,12 @@
         </div>
         <!-- Shown only once a dossier exists. Hidden by default rather
              than rendered-then-hidden so it is never in the tab order
-             for someone who has not uploaded anything yet. -->
+             for someone who has not uploaded anything yet.
+
+             Above the dossier rather than below it: these are the two things a
+             reader wants the moment they have a dossier worth having, and they
+             were previously stranded underneath a switcher they had to scroll
+             past to reach. -->
         <div class="dossier-actions" id="dossier-actions" hidden>
           <a class="button" id="resume-download" href="/api/resume/document"
              download>Download your resume</a>
@@ -132,46 +177,64 @@
              rel="noopener">Print or save as PDF</a>
         </div>
         <div id="dossier-body"></div>
-      </section>
+        <!-- The dossier view switcher.
+             This is the "many versions" idea made tangible: one dossier, read
+             differently for each kind of work. Rendered hidden until a dossier
+             exists, because a switcher with nothing to switch between is noise.
 
+             It used to sit ABOVE the dossier, which put two paragraphs of
+             explanation between the reader and their own employment history —
+             "How you are being shown", and the note about this being one dossier
+             rather than a different person per view. Both are worth saying once.
+             Neither is worth saying before the thing being described, and leading
+             with a disclaimer made the page read as a warning attached to a
+             candidate rather than as their record.
+
+             So it moved below, after the dossier it switches. The reader now meets
+             their identity card, their employment and their download button first,
+             and finds the explanation where it answers a question they have
+             already formed. -->
+        <div class="dossier-views" id="dossier-views" hidden>
+          <div class="dv-head">
+            <p class="eyebrow">How you are being shown</p>
+            <p class="dv-note" id="dv-note"></p>
+          </div>
+          <div class="dv-tabs" id="dv-tabs" role="tablist" aria-label="Dossier view"></div>
+          <div class="dv-body" id="dv-body" role="tabpanel" aria-live="polite"></div>
+        </div>
+      </section>
+      </div>
+    </section>
     <section class="section" id="jobby" aria-label="Jobby McJobberson">
       <div class="section-heading">
         <p class="eyebrow">Your agent</p>
         <h2>Jobby McJobberson</h2>
         <p>Your career is the mission. Jobby works your corner: it reads the market, decides what to chase, writes the outreach, and keeps the pipeline moving until income is secured — and after.</p>
-      </div>
-
-      <div class="jobby-status" id="jobby-status" hidden>
-        <div class="jobby-mission">
-          <p class="jobby-mission-label">Mission</p>
-          <p class="jobby-mission-value" id="jobby-mission">—</p>
-        </div>
-        <div class="jobby-tracks" id="jobby-tracks"></div>
-        <div class="jobby-controls">
-          <label class="jobby-toggle">
-            <input type="checkbox" id="jobby-autonomy" checked>
-            <span>Send outreach on my own</span>
-          </label>
-          <label class="jobby-toggle">
-            <input type="checkbox" id="jobby-kill-switch">
-            <span>Emergency stop</span>
-          </label>
-          <p class="jobby-cap" id="jobby-cap">—</p>
-        </div>
+        <p class="jobby-noresume">
+          <strong>Do not have a resume?</strong> That is not a problem, and it is the more common
+          starting point than it should be. Skip the upload box above and just start talking — tell
+          Jobby what you did, what you are good at, what you want next. It writes it down as you go,
+          tells you what is still missing rather than guessing at it, and builds the resume from
+          your own words.
+        </p>
+        <p class="jobby-noresume" id="jobby-widget-invite">
+          <strong>The conversation is in the corner of every page.</strong> It was a section here
+          until it became clear that asking a question meant scrolling to find it and then navigating
+          back to read the answer. Open the Jobby button at the bottom of the screen and it stays
+          with you — on your dashboard, on this page, wherever you go.
+        </p>
       </div>
 
       <div class="jobby-grid">
-        <div class="jobby-chat">
-          <div class="jobby-log" id="jobby-log" role="log" aria-live="polite" aria-label="Conversation with Jobby">
-            <p class="jobby-empty" id="jobby-empty">Upload a resume and Jobby takes it from there.</p>
-          </div>
-          <form class="jobby-compose" id="jobby-form">
-            <label class="visually-hidden" for="jobby-input">Message Jobby</label>
-            <textarea id="jobby-input" rows="2" placeholder="Ask Jobby anything, or tell it something new about you…" autocomplete="off"></textarea>
-            <button type="submit" id="jobby-send">Send</button>
-          </form>
-          <p class="jobby-hint" id="jobby-hint">Jobby writes to your dossier when you tell it something. Every change is logged and you can see it below.</p>
-        </div>
+        <!-- The chat itself is gone from here. It is built and mounted by
+             jobby-chat-widget.js so that every page can carry it without three
+             copies of the same markup to drift apart, and so the front page and
+             the dashboard cannot disagree about what the chat contains.
+
+             The ids the old markup used — jobby-log, jobby-form, jobby-input,
+             jobby-send, jobby-hint, attach-row, attach-list — are recreated
+             verbatim by the widget, so jobby.js, app.js and styles.css needed no
+             new vocabulary. -->
 
         <aside class="jobby-side">
           <div class="jobby-card" id="google-card">
@@ -200,19 +263,104 @@
           </div>
         </aside>
       </div>
+
+      <div class="jobby-status" id="jobby-status" hidden>
+        <div class="jobby-mission">
+          <p class="jobby-mission-label">Mission</p>
+          <p class="jobby-mission-value" id="jobby-mission">—</p>
+        </div>
+        <div class="jobby-tracks" id="jobby-tracks"></div>
+        <div class="jobby-controls">
+          <label class="jobby-toggle">
+            <input type="checkbox" id="jobby-autonomy" checked>
+            <span>Send outreach on my own</span>
+          </label>
+          <label class="jobby-toggle">
+            <input type="checkbox" id="jobby-kill-switch">
+            <span>Emergency stop</span>
+          </label>
+          <p class="jobby-cap" id="jobby-cap">—</p>
+        </div>
+
+        <!-- Email verification.
+             This panel is the only reason the claim feature is reachable at all.
+             The two endpoints behind it were built, documented and tested, and no
+             page called them: a candidate could not ask for a code or type one in,
+             so their address could never be proved, so every application was
+             refused. A gate nobody can open is the same as no gate.
+
+             Two states, because they need different words. "Not verified" when
+             nothing has been asked for, and "we sent you a code" when one is
+             already in their inbox - telling someone to "verify your email" while
+             they are looking at an unread message from us is how you lose them. -->
+        <div class="jobby-verify" id="jobby-verify" hidden>
+          <div class="jobby-verify-verified" id="jobby-verify-verified" hidden>
+            <span class="jobby-verify-tick" aria-hidden="true">✓</span>
+            <span id="jobby-verify-verified-text">Email confirmed</span>
+          </div>
+
+          <div id="jobby-verify-unverified">
+            <p class="jobby-verify-lead" id="jobby-verify-lead">
+              Confirm your email and Jobby can apply to jobs on your behalf. It sends
+              six digits to that inbox and you give them back here.
+            </p>
+            <form class="jobby-verify-form" id="jobby-verify-form">
+              <label class="jobby-verify-label" for="jobby-verify-email">Your email address</label>
+              <input type="email" id="jobby-verify-email" autocomplete="email"
+                     inputmode="email" placeholder="you@example.com" required>
+              <button type="submit" id="jobby-verify-send">Send me a code</button>
+            </form>
+
+            <form class="jobby-verify-form" id="jobby-verify-code-form" hidden>
+              <label class="jobby-verify-label" for="jobby-verify-code">The six digits</label>
+              <input type="text" id="jobby-verify-code" inputmode="numeric"
+                     autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6"
+                     placeholder="000000" required>
+              <button type="submit" id="jobby-verify-confirm">Confirm</button>
+            </form>
+
+            <p class="jobby-hint" id="jobby-verify-status" role="status" aria-live="polite"></p>
+          </div>
+        </div>
+      </div>
     </section>
+
+    <!-- Results sit below the hero, on the flat page. Inside it they grew
+         the section without bound and were laid over the moving background. -->
+      <section class="parsed-profile-section" id="parsed-profile" aria-label="Parsed resume profile" hidden>
+        <div class="section-heading">
+          <p class="eyebrow">Source-derived profile</p>
+          <h2>Resume signals ready for review</h2>
+          <p>Only content found in the uploaded resume is shown.</p>
+        </div>
+        <div class="parsed-profile-grid">
+          <article class="parsed-card">
+            <h3>Skills</h3>
+            <ul id="parsed-skills"></ul>
+          </article>
+          <article class="parsed-card">
+            <h3>Related job fields</h3>
+            <ul id="parsed-fields"></ul>
+          </article>
+          <article class="parsed-card">
+            <h3>Links</h3>
+            <ul id="parsed-links"></ul>
+          </article>
+        </div>
+      </section>
+
 
     <section class="section" id="funnel">
       <div class="section-heading">
         <p class="eyebrow">What it actually does</p>
         <h2>Four things, done properly.</h2>
-        <p>Most job search tools are a template library and a button. Jobby holds your professional identity in one place, keeps it honest, and does the repetitive part of the search on your behalf.</p>
+        <p>Most job search tools are a template library and a button. Jobby holds your professional identity in one place, reads it through the lens that job actually needs, and does the repetitive part of the search on your behalf.</p>
       </div>
       <div class="feature-grid">
         <article class="feature-card">
           <span class="icon">01</span>
-          <h3>One version of you</h3>
-          <p>Your resume, contact details, roles and skills live in a single dossier. Correct it once and every application after that is right. Tell Jobby something new in plain words and it writes it in, with your name on the change.</p>
+          <h3>Every version of you</h3>
+          <p>One dossier, read differently for every kind of work. A career that looks thin to a site recruiter and strong to an editor is not two careers — it is one, and the view is what changes. Nothing is invented to fill a gap; if a view has nothing to show, it says so.</p>
         </article>
         <article class="feature-card">
           <span class="icon">02</span>
@@ -235,7 +383,7 @@
     <section class="section tracks" id="tracks">
       <div class="section-heading">
         <p class="eyebrow">Multi-Track Strategy</p>
-        <h2>Four tracks. One control plane.</h2>
+        <h2>Five tracks. One control plane.</h2>
       </div>
       <div class="track-table" role="table" aria-label="Jobby tracks">
         <div class="track-row track-head" role="row">
@@ -263,7 +411,90 @@
           <span>ATS Automation: Boundary-aware automation for seamless application delivery via Page-Agent.</span>
           <span class="status boundary">Page-agent boundary</span>
         </div>
+        <div class="track-row" role="row">
+          <strong>Track 5</strong>
+          <span>FIFO &amp; Remote-Site Roles: Fly-in/fly-out and austere-site work across mining, offshore oil and gas, polar stations, remote trades and shipboard roles.</span>
+          <span class="status boundary">Opens on a stated willingness to rotate</span>
+        </div>
       </div>
+
+      <!-- Track 5 only. Kept honest about what the roster can and cannot tell
+           you, because a FIFO candidate is making a decision about weeks away
+           from home and needs to know which numbers are real. -->
+      <div class="track-note" id="fifo-track-note">
+        <h3>About fly-in/fly-out work</h3>
+        <p>
+          Rotational roles mean fixed blocks on site — often two weeks on, two off —
+          with camp or bunk accommodation, and contracts that run a season rather
+          than a year. Flights, housing and meals are commonly covered; visa
+          sponsorship is not, and neither is the ordinary part of your life while
+          you are away.
+        </p>
+        <p>
+          The roster behind this track is 88 roles. Two things about it you should
+          know before you rely on it: most links point at an employer's careers
+          page or a job board search rather than a specific requisition, so they
+          need finding first; and the pay figures are conversions of local ranges,
+          not numbers any employer quoted. Jobby shows the employer's own wording
+          beside them rather than the converted figure alone.
+        </p>
+        <p>
+          This track does not open on a resume that merely shows site experience.
+          Having worked a northern mine says someone can do the work; it does not
+          say they want to be away three weeks at a time, and plenty of people who
+          could are bound by dependants, health, or a partner who cannot travel.
+          Say you want rotations and it opens.
+        </p>
+      </div>
+    </section>
+
+    <!-- The jobs, from the public feeds.
+         Placed after the strategy table rather than before it: the table is the
+         argument for why this product understands somebody's particular work, and a
+         list of jobs dropped above it would answer a question nobody has asked yet.
+
+         Rendered by jobs.js from /api/jobby/board. The server sends a `note` with
+         every response saying nobody has verified these and the employer is
+         sometimes read out of a title, and that note is rendered on the page rather
+         than left in a JSON field — a list of jobs with no stated provenance is
+         exactly the FIFO-roster mistake this product exists to avoid. -->
+    <section class="section" id="jobs" aria-label="Jobs from the public feeds">
+      <div class="section-heading">
+        <p class="eyebrow">Live from public feeds</p>
+        <h2>The jobs it is reading right now.</h2>
+        <p>
+          Every one of these came off a public job feed in the last few days, and
+          every one is here with the feed it came from attached. Jobby has not read
+          or checked any of them.
+        </p>
+      </div>
+
+      <div class="jobs-controls">
+        <label class="jobs-search">
+          <span class="visually-hidden">Search jobs</span>
+          <input type="search" id="jobs-search" placeholder="Search roles or employers"
+                 autocomplete="off">
+        </label>
+        <label class="jobs-select">
+          <span class="visually-hidden">Filter by source</span>
+          <select id="jobs-feed"><option value="">Every source</option></select>
+        </label>
+        <div class="jobs-stats" id="jobs-count" role="status" aria-live="polite">
+          <p class="jobs-stat"><span class="jobs-stat-value">—</span> <span class="jobs-stat-label">Loading…</span></p>
+        </div>
+      </div>
+
+      <!-- The honesty note, in the page, not in a field nobody reads. -->
+      <p class="jobs-trust" id="jobs-trust"></p>
+
+      <div id="jobs-body">
+        <p class="empty-note">Loading the board…</p>
+      </div>
+
+      <details class="jobs-sources">
+        <summary>Where these come from, and what each source is good for</summary>
+        <div id="jobs-registry"></div>
+      </details>
     </section>
 
     <section class="section" id="audit">
@@ -299,7 +530,18 @@
   </footer>
 
   <script src="app.js" defer></script>
-<script src="hero-scene.js" defer></script>
-<script src="jobby.js" defer></script>
+  <script src="hero-scene.js" defer></script>
+  <!-- Before jobby.js, which reads window.JobbyChat and window.JobbyTTS on init. -->
+  <script src="chat-experience.js" defer></script>
+  <!-- Before jobby.js for a second, load-order reason: jobby.js caches the chat's
+       elements once and attaches listeners to them, so the panel must exist by
+       the time it runs. Both are `defer`, which means document order, so this has
+       to be listed first. Listed second, the widget renders perfectly and every
+       listener is attached to a detached form — a chat that sends nothing. -->
+  <script src="jobby-chat-widget.js" defer></script>
+  <script src="jobby.js" defer></script>
+  <!-- The jobs list. Last, because it is the only part of the page that fetches
+       something large and nothing above it depends on it being ready. -->
+  <script src="jobs.js" defer></script>
 </body>
 </html>

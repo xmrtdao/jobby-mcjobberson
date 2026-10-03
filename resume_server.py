@@ -96,6 +96,20 @@ _DASHBOARD_ASSETS = {
 }
 _STATIC_ASSETS = _DASHBOARD_ASSETS | {
     "index.html", "styles.css", "app.js", "jobby.js", "hero-scene.js", "i18n.js",
+    # Social and SEO assets for jobbymcjobberson.com.
+    #
+    # These have to be listed here because this set is an ALLOWLIST, not a
+    # directory listing. An asset that is on disk but absent below is simply not
+    # served - so an og:image that 404s produces a social card with no picture,
+    # and a missing favicon produces a blank tab icon. Both fail silently, which
+    # is why they are named explicitly rather than added by prefix.
+    "robots.txt",
+    "sitemap.xml",
+    "site.webmanifest",
+    "jobby-og.png",
+    "jobby-favicon-16.png",
+    "jobby-favicon-32.png",
+    "jobby-favicon-512.png",
 }
 # The assets that get a version stamp in the entry point's markup. Both new pages
 # are entry points, so their own assets need stamping too — without it a cached

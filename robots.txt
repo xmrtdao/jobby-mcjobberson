@@ -1,0 +1,24 @@
+# robots.txt for jobbymcjobberson.com
+#
+# The product site is meant to be found. The resume/orchestrator tooling lives
+# on the same origin and is not: it is a development surface, not a product
+# page, and indexing it puts implementation detail in search results.
+
+User-agent: *
+Allow: /
+
+# Development and orchestration surface. Public because the SPA is served from
+# the same origin, not because it should be indexed.
+Disallow: /api/
+Disallow: /dashboard.html
+Disallow: /*?debug
+Disallow: /*?token
+Disallow: /*?key
+
+User-agent: GPTBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+Sitemap: https://jobbymcjobberson.com/sitemap.xml
